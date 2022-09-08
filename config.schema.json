@@ -1,15 +1,47 @@
 {
-  "pluginAlias": "ExampleHomebridgePlugin",
+  "pluginAlias": "HomebridgeTibberPrice",
   "pluginType": "platform",
   "singular": true,
+  "headerDisplay": "Get a Tibber API key: (Here)[https://developer.tibber.com/settings/access-token]<br />",
   "schema": {
     "type": "object",
     "properties": {
-      "name": {
-        "title": "Name",
+      "accessToken": {
+        "title": "Tibber Access Token",
+        "description": "Your Tibber API key, click the link above to generate one if you don't have one already.",
         "type": "string",
-        "required": true,
-        "default": "Example Dynamic Platform"
+        "required": true
+      },
+      "homeId": {
+        "title": "Tibber Home ID",
+        "description": "Use only if you have multiple homes setup for your Tibber account. Otherwise, will use the first Home Tibber responds with",
+        "type": "string",
+        "required": false
+      },
+      "priceIncTax": {
+        "title": "Price including tax",
+        "description": "Show prices as total. (Gross, including any taxes)",
+        "type": "boolean",
+        "required": false,
+        "default": true
+      },
+      "activatePriceGraphing": {
+        "title": "Price graphing",
+        "description": "If enabled, the plugin will generate a PNG image of the price throughout the day, stored under \"/bla/test.png\". Use together with https://github.com/Sunoo/homebridge-camera-ffmpeg",
+        "type": "boolean",
+        "required": false
+      },
+      "activatePriceSensor": {
+        "title": "Actual price sensor",
+        "description": "Register a \"Light sensor\" that will show the current electricity price (in the smallest currency format) as LUX level.",
+        "type": "boolean",
+        "required": false
+      },
+      "activateRelativePriceSensor": {
+        "title": "Relative price sensor",
+        "description": "Register a \"Light sensor\" that will show a value between 0 and 1000 LUX(%), based on the relative electricity price at any given moment. (Can be used for automation)",
+        "type": "boolean",
+        "required": false
       }
     }
   }
