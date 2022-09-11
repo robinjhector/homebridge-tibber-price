@@ -2,7 +2,6 @@ import {API, Characteristic, DynamicPlatformPlugin, Logger, PlatformAccessory, P
 
 import {PLATFORM_NAME, PLUGIN_NAME} from './settings';
 import {TibberPriceSensor} from './priceSensor';
-import {TibberQuery} from 'tibber-api';
 import {CachedTibberClient} from './tibber';
 
 /**
@@ -31,8 +30,7 @@ export class TibberPricePlatform implements DynamicPlatformPlugin {
       throw new Error('(homebridge-tibber-price) Invalid config! "accessToken" is required');
     }
 
-    const theConf = this.config as unknown as Config;
-    this.tibber = new CachedTibberClient(this, theConf);
+    this.tibber = new CachedTibberClient(this);
 
     // When this event is fired it means Homebridge has restored all cached accessories from disk.
     // Dynamic Platform plugins should only register new accessories after this event was fired,
@@ -86,8 +84,9 @@ export class TibberPricePlatform implements DynamicPlatformPlugin {
   }
 }
 
-export interface Config {
+export interface TypedConfig {
   accessToken: string;
   homeId?: string;
   priceIncTax: boolean;
 }
+

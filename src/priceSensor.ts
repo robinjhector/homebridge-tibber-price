@@ -35,11 +35,8 @@ export class TibberPriceSensor {
   }
 
   async getCurrentPrice(): Promise<CharacteristicValue> {
-    return this.platform.tibber.getTodayPrice()
-      .then(ip => {
-        this.platform.log.info('Got some info from Tibber', ip);
-        return ip[0].total;
-      }) || 0;
+    return this.platform.tibber.getCurrentPrice()
+      .then(ip => ip?.total || 0);
 
     //return 100;
     // if you need to return an error to show the device as "Not Responding" in the Home app:
