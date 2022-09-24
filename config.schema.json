@@ -29,18 +29,21 @@
         "title": "Price graphing",
         "description": "If enabled, the plugin will generate a PNG image of the price throughout the day, stored under \"/bla/test.png\". Use together with https://github.com/Sunoo/homebridge-camera-ffmpeg",
         "type": "boolean",
+        "default": true,
         "required": false
       },
       "activatePriceSensor": {
         "title": "Actual price sensor",
-        "description": "Register a \"Light sensor\" that will show the current electricity price (in the smallest currency format) as LUX level.",
+        "description": "Register a \"Light sensor\" that will show the current electricity price (in the smallest currency format) as LUX level. (Can be used for automation)",
         "type": "boolean",
+        "default": true,
         "required": false
       },
       "activateRelativePriceSensor": {
         "title": "Relative price sensor",
-        "description": "Register a \"Battery\" that will show a value between 0 and 100%, based on the relative electricity price at any given moment. (Can be used for automation)",
+        "description": "Register a \"HumiditySensor\" that will show a value between 0 and 100%, based on the relative electricity price at any given moment. (Can be used for automation)",
         "type": "boolean",
+        "default": true,
         "required": false
       }
     }
