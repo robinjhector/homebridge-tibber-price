@@ -2,7 +2,7 @@ import {TibberQuery} from 'tibber-api';
 import {TibberPricePlatform, TypedConfig} from './platform';
 import {IPrice} from 'tibber-api/lib/src/models/IPrice';
 import fs from 'fs';
-import {dateEq, dateHrEq, formatDate} from './utils';
+import {dateEq, dateHrEq, formatDate, fractionated} from './utils';
 import {HAPStatus} from 'homebridge';
 
 export class CachedTibberClient {
@@ -10,6 +10,7 @@ export class CachedTibberClient {
   private readonly tibber: TibberQuery;
   private readonly path: string;
   private readonly cache: Map<string, IPrice[]>;
+  private priceIncTax = true;
   private homeId?: string;
   private initiated = false;
 
@@ -20,6 +21,7 @@ export class CachedTibberClient {
     this.path = platform.api.user.storagePath() + '/tibber-price';
     this.cache = new Map();
     this.homeId = config.homeId;
+    this.priceIncTax = config.priceIncTax;
     this.tibber = new TibberQuery({
       active: true,
       apiEndpoint: {
@@ -47,7 +49,7 @@ export class CachedTibberClient {
     this.platform.log.info('Initialized Tibber client');
   }
 
-  getCurrentPrice(): Promise<IPrice> {
+  getCurrentPrice(): Promise<number> {
     if (!this.initiated) {
       throw new this.platform.api.hap.HapStatusError(HAPStatus.RESOURCE_BUSY);
     }
@@ -55,9 +57,26 @@ export class CachedTibberClient {
     return this.getPricesForHour(now);
   }
 
-  private getPricesForHour(forDateAndHour: Date): Promise<IPrice> {
+  getCurrentPriceRelatively(): Promise<number> {
+    if (!this.initiated) {
+      throw new this.platform.api.hap.HapStatusError(HAPStatus.RESOURCE_BUSY);
+    }
+    const forDateAndHour = new Date();
     return this.getPricesForDay(forDateAndHour)
-      .then(prices => prices.find(price => dateHrEq(forDateAndHour, new Date(price.startsAt))) || this.throwServiceComFailure());
+      .then(prices => {
+        const allPricesForToday = prices.map(price => fractionated(price, this.priceIncTax));
+        const currIPrice = prices.find(price => dateHrEq(forDateAndHour, new Date(price.startsAt))) || this.throwServiceComFailure();
+        const currPrice = fractionated(currIPrice, this.priceIncTax);
+        const maxPrice = Math.max(...allPricesForToday);
+
+        return (currPrice / maxPrice) * 100;
+      });
+  }
+
+  private getPricesForHour(forDateAndHour: Date): Promise<number> {
+    return this.getPricesForDay(forDateAndHour)
+      .then(prices => prices.find(price => dateHrEq(forDateAndHour, new Date(price.startsAt))) || this.throwServiceComFailure())
+      .then(price => fractionated(price, this.priceIncTax));
   }
 
   private getPricesForDay(forDate: Date): Promise<IPrice[]> {

@@ -3,6 +3,7 @@ import {API, Characteristic, DynamicPlatformPlugin, Logger, PlatformAccessory, P
 import {PLATFORM_NAME, PLUGIN_NAME} from './settings';
 import {TibberPriceSensor} from './priceSensor';
 import {CachedTibberClient} from './tibber';
+import {TibberRelativePriceSensor} from './relativePriceSensor';
 
 /**
  * HomebridgePlatform
@@ -16,6 +17,7 @@ export class TibberPricePlatform implements DynamicPlatformPlugin {
 
   // this is used to track restored cached accessories
   public readonly accessories: PlatformAccessory[] = [];
+  public readonly backgroundTasks: any[] = [];
   public readonly tibber: CachedTibberClient;
 
   constructor(
@@ -61,6 +63,18 @@ export class TibberPricePlatform implements DynamicPlatformPlugin {
   discoverDevices() {
     this.log.info('Registering devices...');
     this.registerDeregisterPriceSensor();
+    this.registerDeregisterRelativePriceSensor();
+    this.log.info('Starting background tasks...');
+
+    setInterval(() => {
+      for (const backgroundTask of this.backgroundTasks) {
+        try {
+          backgroundTask();
+        } catch (e) {
+          this.log.error('Failed to perform background task!');
+        }
+      }
+    }, 1000 * 60);
   }
 
   private registerDeregisterPriceSensor() {
@@ -79,6 +93,26 @@ export class TibberPricePlatform implements DynamicPlatformPlugin {
       }
     } else if (existingAccessory) {
       this.log.info('Removing price sensor with id %s', uuid);
+      this.api.unregisterPlatformAccessories(PLATFORM_NAME, PLATFORM_NAME, [existingAccessory]);
+    }
+  }
+
+  private registerDeregisterRelativePriceSensor() {
+    const uuid = this.api.hap.uuid.generate('hb-tb-price-rel-price-sensor');
+    const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
+
+    if (this.config['activateRelativePriceSensor']) {
+      this.log.info('Registering relative price sensor with id %s', uuid);
+
+      if (existingAccessory) {
+        new TibberRelativePriceSensor(this, existingAccessory);
+      } else {
+        const priceSensorAccessory = new this.api.platformAccessory('Relative electricity price', uuid);
+        new TibberRelativePriceSensor(this, priceSensorAccessory);
+        this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [priceSensorAccessory]);
+      }
+    } else if (existingAccessory) {
+      this.log.info('Removing relative price sensor with id %s', uuid);
       this.api.unregisterPlatformAccessories(PLATFORM_NAME, PLATFORM_NAME, [existingAccessory]);
     }
   }

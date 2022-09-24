@@ -39,7 +39,7 @@
       },
       "activateRelativePriceSensor": {
         "title": "Relative price sensor",
-        "description": "Register a \"Light sensor\" that will show a value between 0 and 1000 LUX(%), based on the relative electricity price at any given moment. (Can be used for automation)",
+        "description": "Register a \"Battery\" that will show a value between 0 and 100%, based on the relative electricity price at any given moment. (Can be used for automation)",
         "type": "boolean",
         "required": false
       }

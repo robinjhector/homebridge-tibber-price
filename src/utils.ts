@@ -1,3 +1,5 @@
+import {IPrice} from 'tibber-api/lib/src/models/IPrice';
+
 export function padTo2Digits(num: number): string {
   return num.toString().padStart(2, '0');
 }
@@ -20,4 +22,8 @@ export function dateEq(d1: Date, d2: Date): boolean {
 
 export function dateHrEq(d1: Date, d2: Date): boolean {
   return dateEq(d1, d2) && d1.getHours() === d2.getHours();
+}
+
+export function fractionated(price: IPrice, incTax: boolean): number {
+  return (incTax ? price.total : price.total - price.tax) * 100;
 }

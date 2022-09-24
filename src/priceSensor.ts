@@ -3,9 +3,10 @@ import {CharacteristicValue, PlatformAccessory, Service} from 'homebridge';
 import {TibberPricePlatform} from './platform';
 
 /**
- * Platform Accessory
- * An instance of this class is created for each accessory your platform registers
- * Each accessory may expose multiple services of different service types.
+ * Registers a price value accessory, that will manifest itself as a LightSensor.
+ * Displaying the price in cents, as "Current ambiance level" (lux)
+ *
+ * 1KR = 100 lux
  */
 export class TibberPriceSensor {
   private service: Service;
@@ -21,25 +22,24 @@ export class TibberPriceSensor {
       .setCharacteristic(this.platform.Characteristic.Model, 'Tibber-Price Sensor')
       .setCharacteristic(this.platform.Characteristic.SerialNumber, '1.0.0');
 
-    this.service = this.accessory.getService(this.platform.Service.LightSensor) || this.accessory.addService(this.platform.Service.LightSensor);
+    // set services
+    this.service = this.accessory.getService(this.platform.Service.LightSensor)
+      || this.accessory.addService(this.platform.Service.LightSensor);
 
-    // set the service name, this is what is displayed as the default name on the Home app
-    // in this example we are using the name we stored in the `accessory.context` in the `discoverDevices` method.
-    //this.service.setCharacteristic(this.platform.Characteristic.Name, '');
-
-    // each service must implement at-minimum the "required characteristics" for the given service type
-    // see https://developers.homebridge.io/#/service/Lightbulb
-
+    // set handlers
     this.service.getCharacteristic(this.platform.Characteristic.CurrentAmbientLightLevel)
       .onGet(() => this.getCurrentPrice());
+
+    // register task handlers
+    platform.backgroundTasks.push(() => this.updateValue());
+  }
+
+  private updateValue(): void {
+    this.platform.log.debug('Updating price in the background...');
+    this.getCurrentPrice().then(price => this.service.updateCharacteristic(this.platform.Characteristic.CurrentAmbientLightLevel, price));
   }
 
   async getCurrentPrice(): Promise<CharacteristicValue> {
-    return this.platform.tibber.getCurrentPrice()
-      .then(ip => ip?.total || 0);
-
-    //return 100;
-    // if you need to return an error to show the device as "Not Responding" in the Home app:
-    // throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
+    return this.platform.tibber.getCurrentPrice();
   }
 }
