@@ -40,7 +40,7 @@ export class TibberGraphing {
 
     const dataSets = await Promise.all([
       this.platform.tibber.getTodaysPrices(),
-      this.platform.tibber.getTomorrowsPrices().catch(err => Promise.resolve()),
+      this.platform.tibber.getTomorrowsPrices().catch(() => Promise.resolve()),
     ]).then(promises => {
       const dataSets: object[] = [];
       const [today, tomorrow] = promises;
@@ -113,8 +113,14 @@ export class TibberGraphing {
     };
 
     const chartDataStr = JSON.stringify(chartConf)
-      .replace('"<GRADIENT_FOR_TODAY_LINE>"', 'getGradientFillHelper("vertical", ["#e73827", "#8E0E00", "#1F1C18"])')
-      .replace('"<GRADIENT_FOR_TOMORROW_LINE>"', 'getGradientFillHelper("vertical", ["rgba(244, 121, 31, 0.3)", "rgba(101, 153, 153, 0.3)"])');
+      .replace(
+        '"<GRADIENT_FOR_TODAY_LINE>"',
+        'getGradientFillHelper("vertical", ["#e73827", "#8E0E00", "#1F1C18"])',
+      )
+      .replace(
+        '"<GRADIENT_FOR_TOMORROW_LINE>"',
+        'getGradientFillHelper("vertical", ["rgba(244, 121, 31, 0.3)", "rgba(101, 153, 153, 0.3)"])',
+      );
 
     this.platform.log.debug('Generating chart, request: ', chartDataStr);
     const chartDataB64 = Buffer.from(chartDataStr).toString('base64');

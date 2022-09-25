@@ -179,7 +179,7 @@ export class CachedTibberClient {
     const key = formatDate(forDate);
     const file = this.path + '/' + key + '.json';
     if (!fs.existsSync(file)) {
-      return new Promise((res, rej) => {
+      return new Promise((res) => {
         fs.writeFile(file, JSON.stringify(newPrices), () => {
           this.cache.set(key, newPrices);
           this.platform.log.info('Stored price information for', key);
@@ -191,7 +191,7 @@ export class CachedTibberClient {
     }
   }
 
-  private throwServiceComFailure(): any {
+  private throwServiceComFailure(): never {
     throw new this.platform.api.hap.HapStatusError(HAPStatus.SERVICE_COMMUNICATION_FAILURE);
   }
 }

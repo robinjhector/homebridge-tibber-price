@@ -18,7 +18,7 @@ export class TibberPricePlatform implements DynamicPlatformPlugin {
 
   // this is used to track restored cached accessories
   public readonly accessories: PlatformAccessory[] = [];
-  public readonly backgroundTasks: any[] = [];
+  public readonly backgroundTasks: (() => void)[] = [];
   public readonly tibber: CachedTibberClient;
 
   constructor(
