@@ -1,6 +1,7 @@
 # Homebridge Tibber Price
 
-A simple homebridge plugin that will display prices from your Tibber account, in various forms:
+A simple homebridge plugin that will display prices from your Tibber account, in various forms. (See screenshot further down)
+
 
 ### Accessory: Actual price
 Shows the price, in the smallest denominator of the currency (öre, cents, etc).
@@ -31,5 +32,10 @@ Configure the camera via Homebridge Config UI, and enter this under `Video Sourc
 -f image2 -loop 1 -s 1280x720 -pix_fmt yuvj422p -i <PATH_TO_HOMEBRIDGE_INSTALLATION>/.homebridge/tibber-price/price-chart.png
 ```
 
+This works fine for me, but ffmpeg has a lot of configuration options, so feel free to experiment.
+
 **Don't forget to replace PATH_TO_HOMEBRIDGE_INSTALLATION with the actual location**
 
+### Preview
+
+![IMG_0002](https://user-images.githubusercontent.com/28866344/192147509-71492bf2-649a-4806-b2b9-978d67f48f7f.PNG)
