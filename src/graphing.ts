@@ -105,7 +105,7 @@ export class TibberGraphing {
             label: {
               enabled: true,
               backgroundColor: 'rgba(0, 0, 0, 0.4)',
-              content: 'Now',
+              content: 'Now: ' + Math.round((dataSets[0] as DataSet).data[nowHr]),
             },
           }],
         },
@@ -146,4 +146,8 @@ export class TibberGraphing {
     this.lastRender = new Date();
   }
 
+}
+
+interface DataSet {
+  data: number[];
 }
