@@ -12,7 +12,7 @@ export class CachedTibberClient {
   private readonly cache: Map<string, IPrice[]>;
   private priceIncTax = true;
   private homeId?: string;
-  private initiated = false;
+  public initiated = false;
 
   constructor(
     private readonly platform: TibberPricePlatform,
@@ -71,6 +71,27 @@ export class CachedTibberClient {
 
         return (currPrice / maxPrice) * 100;
       });
+  }
+
+  getTodaysPrices(): Promise<number[]> {
+    if (!this.initiated) {
+      throw new this.platform.api.hap.HapStatusError(HAPStatus.RESOURCE_BUSY);
+    }
+    const today = new Date();
+    return this.getPricesForDay(today)
+      .then(prices => prices.map(price => fractionated(price, this.priceIncTax)));
+  }
+
+  getTomorrowsPrices(): Promise<number[]> {
+    if (!this.initiated) {
+      throw new this.platform.api.hap.HapStatusError(HAPStatus.RESOURCE_BUSY);
+    }
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(today.getDate() + 1);
+
+    return this.getPricesForDay(tomorrow)
+      .then(prices => prices.map(price => fractionated(price, this.priceIncTax)));
   }
 
   private getPricesForHour(forDateAndHour: Date): Promise<number> {

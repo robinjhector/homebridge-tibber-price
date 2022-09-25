@@ -4,6 +4,7 @@ import {PLATFORM_NAME, PLUGIN_NAME} from './settings';
 import {TibberPriceSensor} from './priceSensor';
 import {CachedTibberClient} from './tibber';
 import {TibberRelativePriceSensor} from './relativePriceSensor';
+import {TibberGraphing} from './graphing';
 
 /**
  * HomebridgePlatform
@@ -64,6 +65,7 @@ export class TibberPricePlatform implements DynamicPlatformPlugin {
     this.log.info('Registering devices...');
     this.registerDeregisterPriceSensor();
     this.registerDeregisterRelativePriceSensor();
+    this.registerDeregisterPriceGraphing();
     this.log.info('Starting background tasks...');
 
     setInterval(() => {
@@ -114,6 +116,12 @@ export class TibberPricePlatform implements DynamicPlatformPlugin {
     } else if (existingAccessory) {
       this.log.info('Removing relative price sensor with id %s', uuid);
       this.api.unregisterPlatformAccessories(PLATFORM_NAME, PLATFORM_NAME, [existingAccessory]);
+    }
+  }
+
+  private registerDeregisterPriceGraphing() {
+    if (this.config['activatePriceGraphing']) {
+      new TibberGraphing(this);
     }
   }
 }

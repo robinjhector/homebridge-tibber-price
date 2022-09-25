@@ -2,7 +2,8 @@
   "pluginAlias": "HomebridgeTibberPrice",
   "pluginType": "platform",
   "singular": true,
-  "headerDisplay": "Get a Tibber API key: (Here)[https://developer.tibber.com/settings/access-token]<br />",
+  "headerDisplay": "Get a Tibber API key: [Here](https://developer.tibber.com/settings/access-token)<br />",
+  "footerDisplay": "If you've enabled \"Price graphing\" the image will be stored under `.homebridge/tibber-price/price-chart.png`.<br />Use this path when configuring [Homebridge Camera FFmpeg](https://github.com/Sunoo/homebridge-camera-ffmpeg)",
   "schema": {
     "type": "object",
     "properties": {
@@ -27,7 +28,7 @@
       },
       "activatePriceGraphing": {
         "title": "Price graphing",
-        "description": "If enabled, the plugin will generate a PNG image of the price throughout the day, stored under \"/bla/test.png\". Use together with https://github.com/Sunoo/homebridge-camera-ffmpeg",
+        "description": "If enabled, the plugin will generate a PNG image of the price throughout the day (and tomorrow), stored under \".homebridge/tibber-price/price-chart.png\"",
         "type": "boolean",
         "default": true,
         "required": false
