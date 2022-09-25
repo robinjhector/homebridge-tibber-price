@@ -3,6 +3,12 @@
 A simple homebridge plugin that will display prices from your Tibber account, in various forms. (See screenshot further down)
 
 
+<hr>
+
+[!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://www.buymeacoffee.com/robinj)
+
+![CI](https://github.com/robinjhector/homebridge-tibber-price/actions/workflows/build.yml/badge.svg?branch=master)
+
 ### Accessory: Actual price
 Shows the price, in the smallest denominator of the currency (öre, cents, etc).
 This accessory will manifest itself as a light sensor, since there is no "energy meter" accessory type in Apple Home. 
