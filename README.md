@@ -36,6 +36,11 @@ This works fine for me, but ffmpeg has a lot of configuration options, so feel f
 
 **Don't forget to replace PATH_TO_HOMEBRIDGE_INSTALLATION with the actual location**
 
-### Preview
+### Preview (from an iPad)
 
 ![IMG_0002](https://user-images.githubusercontent.com/28866344/192147509-71492bf2-649a-4806-b2b9-978d67f48f7f.PNG)
+
+### Rendered graph:
+
+![price-chart](https://user-images.githubusercontent.com/28866344/192149351-403b56e5-afa8-41e2-bccc-670946bcd290.png)
+
