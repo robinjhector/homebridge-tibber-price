@@ -1,7 +1,7 @@
 import {TibberPricePlatform} from './platform';
-import fetch from 'node-fetch';
 import fs from 'fs';
 import {dateHrEq, padTo2Digits} from './utils';
+import axios from 'axios';
 
 export class TibberGraphing {
 
@@ -133,15 +133,14 @@ export class TibberGraphing {
       chart: chartDataB64,
     };
 
-    const response = await fetch('https://quickchart.io/chart', {
-      method: 'POST',
-      body: JSON.stringify(request),
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
+    const writer = fs.createWriteStream(this.path);
+    const response = await axios.post(
+      'https://quickchart.io/chart',
+      request,
+      {headers: {'Content-Type': 'application/json'}, responseType: 'stream'}
+    );
 
-    response.body.pipe(fs.createWriteStream(this.path));
+    response.data.pipe(fs.createWriteStream(this.path))
     this.platform.log.debug('Wrote chart to file');
     this.lastRender = new Date();
   }

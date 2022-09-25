@@ -1,7 +1,7 @@
 {
   "displayName": "Homebridge Tibber Price",
   "name": "homebridge-tibber-price",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Functionality based on Tibber Price (Hourly spot prices). Graphing & sensors for automation",
   "license": "Apache-2.0",
   "repository": {
@@ -30,6 +30,7 @@
     "price"
   ],
   "dependencies": {
+    "axios": "^0.27.2",
     "tibber-api": "^4.1.0"
   },
   "devDependencies": {
