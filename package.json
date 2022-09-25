@@ -33,7 +33,7 @@
     "@types/node": "^16.10.9",
     "@typescript-eslint/eslint-plugin": "^5.38.0",
     "@typescript-eslint/parser": "^5.0.0",
-    "eslint": "^8.0.1",
+    "eslint": "^8.24.0",
     "homebridge": "^1.5.0",
     "homebridge-config-ui-x": "^4.50.1",
     "nodemon": "^2.0.20",
