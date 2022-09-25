@@ -11,6 +11,16 @@
   "bugs": {
     "url": "https://github.com/robinjhector/homebridge-tibber-price/issues"
   },
+  "funding": [
+    {
+      "type": "paypal",
+      "url": "https://paypal.me/robinjhector"
+    },
+    {
+      "type" : "github",
+      "url" : "https://github.com/sponsors/robinjhector"
+    }
+  ],
   "engines": {
     "node": ">=14.18.1",
     "homebridge": ">=1.5.0"
