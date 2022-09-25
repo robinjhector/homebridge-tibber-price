@@ -133,14 +133,13 @@ export class TibberGraphing {
       chart: chartDataB64,
     };
 
-    const writer = fs.createWriteStream(this.path);
     const response = await axios.post(
       'https://quickchart.io/chart',
       request,
-      {headers: {'Content-Type': 'application/json'}, responseType: 'stream'}
+      {headers: {'Content-Type': 'application/json'}, responseType: 'stream'},
     );
 
-    response.data.pipe(fs.createWriteStream(this.path))
+    response.data.pipe(fs.createWriteStream(this.path));
     this.platform.log.debug('Wrote chart to file');
     this.lastRender = new Date();
   }
