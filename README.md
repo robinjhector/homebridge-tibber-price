@@ -29,8 +29,19 @@ The image will be rendered at 1280x720 pixels. Rendering will be done by an http
 In order for this to show up in Apple Home in any meaningful way, you can utilise [Homebridge Camera FFmpeg](https://github.com/Sunoo/homebridge-camera-ffmpeg) plugin to "stream" the image, as a camera accessory.
 
 
-#### Configuring
+### Configuring
 Configure via the Homebridge Config UI.
+
+But if you need to do it manually, here's a short description of the configuration properties:
+| Property                    | Type    | Required | Description                                                                                                                                                             |
+|-----------------------------|---------|----------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| platform                    | string  | YES      | Should be `HomebridgeTibberPrice`                                                                                                                                       |
+| accessToken                 | string  | YES      | Should be your Tibber API key                                                                                                                                           |
+| homeId                      | string  | no       | If you only have one house/home in Tibber, you can ignore this. However, if you have multiple, you should enter your HomeId here, to get the correct price information. |
+| priceIncTax                 | boolean | no       | Show prices with tax/vat included                                                                                                                                       |
+| activatePriceGraphing       | boolean | no       | Enable price graphing (Saved as a PNG every hour)                                                                                                                       |
+| activatePriceSensor         | boolean | no       | Enable the "light sensor" used for current electricty price                                                                                                             |
+| activateRelativePriceSensor | boolean | no       | Enable the "humidity sensor" used for current relative electricty price                                                                                                 |
 
 #### Configuring ffmpeg camera plugin
 Configure the camera via Homebridge Config UI, and enter this under `Video Source`:
