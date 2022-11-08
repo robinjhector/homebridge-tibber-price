@@ -105,7 +105,7 @@ export class TibberGraphing {
             label: {
               enabled: true,
               backgroundColor: 'rgba(0, 0, 0, 0.4)',
-              content: 'Now: ' + Math.round((dataSets[0] as DataSet).data[nowHr]),
+              content: 'Now: ' + Math.round((dataSets[0] as DataSet).data[now.getHours()]),
             },
           }],
         },
@@ -119,7 +119,7 @@ export class TibberGraphing {
       )
       .replace(
         '"<GRADIENT_FOR_TOMORROW_LINE>"',
-        'getGradientFillHelper("vertical", ["rgba(244, 121, 31, 0.3)", "rgba(101, 153, 153, 0.3)"])',
+        'getGradientFillHelper("vertical", ["rgba(244, 121, 31, 0.5)", "rgba(101, 153, 153, 0.5)"])',
       );
 
     this.platform.log.debug('Generating chart, request: ', chartDataStr);
