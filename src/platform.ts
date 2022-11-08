@@ -19,7 +19,7 @@ export class TibberPricePlatform implements DynamicPlatformPlugin {
   // this is used to track restored cached accessories
   public readonly accessories: PlatformAccessory[] = [];
   public readonly backgroundTasks: (() => void)[] = [];
-  public readonly tibber: CachedTibberClient;
+  public readonly tibber?: CachedTibberClient;
 
   constructor(
     public readonly log: Logger,
@@ -30,7 +30,8 @@ export class TibberPricePlatform implements DynamicPlatformPlugin {
 
     const accessToken = this.config['accessToken'];
     if (!accessToken) {
-      throw new Error('(homebridge-tibber-price) Invalid config! "accessToken" is required');
+      this.log.error('(homebridge-tibber-price) Invalid config! "accessToken" is required. Plugin can not start');
+      return;
     }
 
     this.tibber = new CachedTibberClient(this);

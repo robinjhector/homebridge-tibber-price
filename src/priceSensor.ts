@@ -1,6 +1,7 @@
 import {CharacteristicValue, PlatformAccessory, Service} from 'homebridge';
 
 import {TibberPricePlatform} from './platform';
+import {CachedTibberClient} from './tibber';
 
 /**
  * Registers a price value accessory, that will manifest itself as a LightSensor.
@@ -10,12 +11,13 @@ import {TibberPricePlatform} from './platform';
  */
 export class TibberPriceSensor {
   private service: Service;
+  private readonly tibber: CachedTibberClient;
 
   constructor(
     private readonly platform: TibberPricePlatform,
     private readonly accessory: PlatformAccessory,
   ) {
-
+    this.tibber = platform.tibber!;
     // set accessory information
     this.accessory.getService(this.platform.Service.AccessoryInformation)!
       .setCharacteristic(this.platform.Characteristic.Manufacturer, 'robinjhector@github')
@@ -40,6 +42,6 @@ export class TibberPriceSensor {
   }
 
   async getCurrentPrice(): Promise<CharacteristicValue> {
-    return this.platform.tibber.getCurrentPrice();
+    return this.tibber.getCurrentPrice();
   }
 }

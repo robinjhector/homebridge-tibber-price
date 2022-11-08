@@ -1,6 +1,7 @@
 import {CharacteristicValue, PlatformAccessory, Service} from 'homebridge';
 
 import {TibberPricePlatform} from './platform';
+import {CachedTibberClient} from './tibber';
 
 /**
  * Registers a relative price value accessory, that will manifest itself as a HumiditySensor.
@@ -8,12 +9,13 @@ import {TibberPricePlatform} from './platform';
  */
 export class TibberRelativePriceSensor {
   private service: Service;
+  private readonly tibber: CachedTibberClient;
 
   constructor(
     private readonly platform: TibberPricePlatform,
     private readonly accessory: PlatformAccessory,
   ) {
-
+    this.tibber = platform.tibber!;
     // set accessory information
     this.accessory.getService(this.platform.Service.AccessoryInformation)!
       .setCharacteristic(this.platform.Characteristic.Manufacturer, 'robinjhector@github')
@@ -39,6 +41,6 @@ export class TibberRelativePriceSensor {
   }
 
   async getCurrentRelativePrice(): Promise<CharacteristicValue> {
-    return this.platform.tibber.getCurrentPriceRelatively();
+    return this.tibber.getCurrentPriceRelatively();
   }
 }

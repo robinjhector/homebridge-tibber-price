@@ -2,10 +2,12 @@ import {TibberPricePlatform} from './platform';
 import fs from 'fs';
 import {dateHrEq, padTo2Digits} from './utils';
 import axios from 'axios';
+import {CachedTibberClient} from './tibber';
 
 export class TibberGraphing {
 
   private readonly path: string;
+  private readonly tibber: CachedTibberClient;
   private readonly constants = {
     labels: [...Array(25).keys()].map(i => padTo2Digits(i)),
   };
@@ -17,6 +19,7 @@ export class TibberGraphing {
   ) {
     this.path = platform.api.user.storagePath() + '/tibber-price/price-chart.png';
     this.lastRender = new Date(2022, 1, 1);
+    this.tibber = platform.tibber!;
 
     // Tibber Client will probably not be initialised, so wait 5s before drawing the first chart
     setTimeout(() => this.graphIt(), 5000);
@@ -33,14 +36,14 @@ export class TibberGraphing {
       return;
     }
 
-    if (!this.platform.tibber.initiated) {
+    if (!this.tibber.initiated) {
       // Tibber client not fully initialised yet
       return;
     }
 
     const dataSets = await Promise.all([
-      this.platform.tibber.getTodaysPrices(),
-      this.platform.tibber.getTomorrowsPrices().catch(() => Promise.resolve()),
+      this.tibber.getTodaysPrices(),
+      this.tibber.getTomorrowsPrices().catch(() => Promise.resolve()),
     ]).then(promises => {
       const dataSets: object[] = [];
       const [today, tomorrow] = promises;
