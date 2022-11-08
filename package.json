@@ -40,7 +40,7 @@
     "price"
   ],
   "dependencies": {
-    "axios": "^0.27.2",
+    "axios": "^1.1.3",
     "tibber-api": "^4.1.0"
   },
   "devDependencies": {
