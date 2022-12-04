@@ -1,4 +1,4 @@
-import {CharacteristicValue, PlatformAccessory, Service} from 'homebridge';
+import {HAPStatus, PlatformAccessory, Service} from 'homebridge';
 
 import {TibberPricePlatform} from './platform';
 import {CachedTibberClient} from './tibber';
@@ -28,7 +28,10 @@ export class TibberRelativePriceSensor {
 
     // set handlers
     this.service.getCharacteristic(this.platform.Characteristic.CurrentRelativeHumidity)
-      .onGet(() => this.getCurrentRelativePrice());
+      .onGet(() => this.tibber.getCurrentPriceRelatively().catch(err => {
+        this.platform.log.error('[relativePriceSensor] Failed to get price', err);
+        throw new this.platform.api.hap.HapStatusError(HAPStatus.SERVICE_COMMUNICATION_FAILURE);
+      }));
 
     // register task handlers
     platform.backgroundTasks.push(() => this.updateValue());
@@ -36,11 +39,10 @@ export class TibberRelativePriceSensor {
 
   private updateValue(): void {
     this.platform.log.debug('Updating relative price in the background...');
-    this.getCurrentRelativePrice()
-      .then(perc => this.service.updateCharacteristic(this.platform.Characteristic.CurrentRelativeHumidity, perc));
-  }
-
-  async getCurrentRelativePrice(): Promise<CharacteristicValue> {
-    return this.tibber.getCurrentPriceRelatively();
+    this.tibber.getCurrentPriceRelatively()
+      .then(perc => this.service.updateCharacteristic(this.platform.Characteristic.CurrentRelativeHumidity, perc))
+      .catch(err => {
+        this.platform.log.error('[relativePriceSensor] Failed to update price in background', err);
+      });
   }
 }

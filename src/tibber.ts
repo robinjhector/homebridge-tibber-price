@@ -3,7 +3,6 @@ import {TibberPricePlatform, TypedConfig} from './platform';
 import {IPrice} from 'tibber-api/lib/src/models/IPrice';
 import fs from 'fs';
 import {dateEq, dateHrEq, formatDate, fractionated} from './utils';
-import {HAPStatus} from 'homebridge';
 
 export class CachedTibberClient {
 
@@ -13,6 +12,7 @@ export class CachedTibberClient {
   private priceIncTax = true;
   private homeId?: string;
   public initiated = false;
+  public errorState = false;
 
   constructor(
     private readonly platform: TibberPricePlatform,
@@ -36,13 +36,29 @@ export class CachedTibberClient {
     }
 
     if (!this.homeId) {
+      // No HomeId specified in config, so let's try and resolve the first one from API.
+      this.platform.log.info('No HomeId specified, reaching out to Tibber API to find the first one');
       this.getFirstHomeId()
         .then(homeId => {
-          this.platform.log.info('No HomeId defined, so using:', homeId);
+          this.platform.log.info('Found Home, with ID:', homeId);
           this.homeId = homeId;
-          this.initiated = true;
-        });
+        }).catch(err => {
+          this.platform.log.error('Failed to query HomeId from Tibber, none of the accessories will work! See error:', err);
+          this.errorState = true;
+        }).finally(() => this.initiated = true);
     } else {
+      this.tibber.getHomes()
+        .then(homes => {
+          const homeIdsFromApi = homes.map(h => h.id);
+          const homeIdValid = homeIdsFromApi.find(hid => hid === this.homeId);
+          if (!homeIdValid) {
+            this.platform.log.error(`Incorrect HomeId in config. Was: '${this.homeId}', but expected one of: ${homeIdsFromApi}`);
+            this.errorState = true;
+          }
+        }).catch(err => {
+          this.platform.log.error('Failed to validate HomeId from Tibber, none of the accessories will work! See error:', err);
+          this.errorState = true;
+        }).finally(() => this.initiated = true);
       this.initiated = true;
     }
 
@@ -50,22 +66,18 @@ export class CachedTibberClient {
   }
 
   getCurrentPrice(): Promise<number> {
-    if (!this.initiated) {
-      throw new this.platform.api.hap.HapStatusError(HAPStatus.RESOURCE_BUSY);
-    }
     const now = new Date();
-    return this.getPricesForHour(now);
+    return this.assertValidState()
+      .then(() => this.getPricesForHour(now));
   }
 
   getCurrentPriceRelatively(): Promise<number> {
-    if (!this.initiated) {
-      throw new this.platform.api.hap.HapStatusError(HAPStatus.RESOURCE_BUSY);
-    }
     const forDateAndHour = new Date();
-    return this.getPricesForDay(forDateAndHour)
+    return this.assertValidState()
+      .then(() => this.getPricesForDay(forDateAndHour))
       .then(prices => {
         const allPricesForToday = prices.map(price => fractionated(price, this.priceIncTax));
-        const currIPrice = prices.find(price => dateHrEq(forDateAndHour, new Date(price.startsAt))) || this.throwServiceComFailure();
+        const currIPrice = prices.find(price => dateHrEq(forDateAndHour, new Date(price.startsAt)))!;
         const currPrice = fractionated(currIPrice, this.priceIncTax);
         const maxPrice = Math.max(...allPricesForToday);
 
@@ -74,29 +86,25 @@ export class CachedTibberClient {
   }
 
   getTodaysPrices(): Promise<number[]> {
-    if (!this.initiated) {
-      throw new this.platform.api.hap.HapStatusError(HAPStatus.RESOURCE_BUSY);
-    }
     const today = new Date();
-    return this.getPricesForDay(today)
+    return this.assertValidState()
+      .then(() => this.getPricesForDay(today))
       .then(prices => prices.map(price => fractionated(price, this.priceIncTax)));
   }
 
   getTomorrowsPrices(): Promise<number[]> {
-    if (!this.initiated) {
-      throw new this.platform.api.hap.HapStatusError(HAPStatus.RESOURCE_BUSY);
-    }
     const today = new Date();
     const tomorrow = new Date(today);
     tomorrow.setDate(today.getDate() + 1);
 
-    return this.getPricesForDay(tomorrow)
+    return this.assertValidState()
+      .then(() => this.getPricesForDay(tomorrow))
       .then(prices => prices.map(price => fractionated(price, this.priceIncTax)));
   }
 
   private getPricesForHour(forDateAndHour: Date): Promise<number> {
     return this.getPricesForDay(forDateAndHour)
-      .then(prices => prices.find(price => dateHrEq(forDateAndHour, new Date(price.startsAt))) || this.throwServiceComFailure())
+      .then(prices => prices.find(price => dateHrEq(forDateAndHour, new Date(price.startsAt)))!)
       .then(price => fractionated(price, this.priceIncTax));
   }
 
@@ -111,8 +119,7 @@ export class CachedTibberClient {
       if (!Array.isArray(homes) || homes.length > 0) {
         return homes[0].id;
       } else {
-        this.platform.log.error('Could not get a HomeId from the Tibber API!');
-        throw new this.platform.api.hap.HapStatusError(HAPStatus.INVALID_VALUE_IN_REQUEST);
+        return Promise.reject('Returned list of Homes via Tibber was empty');
       }
     });
   }
@@ -140,9 +147,14 @@ export class CachedTibberClient {
             this.platform.log.error('Failed to read cached price file', file);
             rej(err);
           }
-          const prices = JSON.parse(data.toString()) as IPrice[];
-          this.cache.set(key, prices);
-          res(prices);
+          try {
+            const prices = JSON.parse(data.toString()) as IPrice[];
+            this.cache.set(key, prices);
+            res(prices);
+          } catch (err) {
+            this.platform.log.debug('Failed to parse prices from file', file);
+            rej('Failed to parse prices from file');
+          }
         });
       });
     }
@@ -157,8 +169,12 @@ export class CachedTibberClient {
     const tomorrow = new Date(today);
     tomorrow.setDate(today.getDate() + 1);
 
-    const responseHandler = (prices: IPrice[]) => {
+    const responseHandler = (prices: IPrice[]): Promise<IPrice[]> => {
       this.platform.log.debug('Received API response', prices);
+      if (!Array.isArray(prices) || prices.length < 1) {
+        this.platform.log.error('No prices returned from API. Was:', prices);
+        return Promise.reject('No prices returned from API!');
+      }
       return this.persistPrices(forDate, prices);
     };
 
@@ -172,27 +188,31 @@ export class CachedTibberClient {
   }
 
   private persistPrices(forDate: Date, newPrices: IPrice[]): Promise<IPrice[]> {
-    if (!Array.isArray(newPrices) || newPrices.length < 1) {
-      return Promise.reject('No prices returned from API!');
-    }
-
     const key = formatDate(forDate);
     const file = this.path + '/' + key + '.json';
-    if (!fs.existsSync(file)) {
-      return new Promise((res) => {
-        fs.writeFile(file, JSON.stringify(newPrices), () => {
+    return new Promise((res, rej) => {
+      fs.writeFile(file, JSON.stringify(newPrices), err => {
+        if (err) {
+          this.platform.log.error('Failed to persist prices to disk', err);
+          rej(err);
+        } else {
           this.cache.set(key, newPrices);
           this.platform.log.info('Stored price information for', key);
           res(newPrices);
-        });
+        }
       });
-    } else {
-      return Promise.reject('File already exists: ' + file);
-    }
+    });
   }
 
-  private throwServiceComFailure(): never {
-    throw new this.platform.api.hap.HapStatusError(HAPStatus.SERVICE_COMMUNICATION_FAILURE);
+  private assertValidState(): Promise<unknown> {
+    if (!this.initiated) {
+      return Promise.reject('Tibber client not initialised yet');
+    }
+    if (this.errorState) {
+      return Promise.reject('The Tibber Client is in an error state. Check logs.');
+    }
+
+    return Promise.resolve();
   }
 }
 

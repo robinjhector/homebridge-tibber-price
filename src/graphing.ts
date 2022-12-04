@@ -37,7 +37,11 @@ export class TibberGraphing {
     }
 
     if (!this.tibber.initiated) {
-      // Tibber client not fully initialised yet
+      this.platform.log.debug('Tibber client not yet initialised. Will try again later');
+      return;
+    }
+    if (this.tibber.errorState) {
+      this.platform.log.error('Cannot graph prices, Tibber client in an error state. Check the logs for errors');
       return;
     }
 
@@ -76,7 +80,13 @@ export class TibberGraphing {
       }
 
       return dataSets;
+    }).catch(err => {
+      this.platform.log.error('Cannot graph prices:', err);
     });
+
+    if (!dataSets) {
+      return;
+    }
 
     const chartConf = {
       type: 'line',

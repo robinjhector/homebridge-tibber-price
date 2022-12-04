@@ -1,4 +1,4 @@
-import {CharacteristicValue, PlatformAccessory, Service} from 'homebridge';
+import {HAPStatus, PlatformAccessory, Service} from 'homebridge';
 
 import {TibberPricePlatform} from './platform';
 import {CachedTibberClient} from './tibber';
@@ -30,7 +30,10 @@ export class TibberPriceSensor {
 
     // set handlers
     this.service.getCharacteristic(this.platform.Characteristic.CurrentAmbientLightLevel)
-      .onGet(() => this.getCurrentPrice());
+      .onGet(() => this.tibber.getCurrentPrice().catch(err => {
+        this.platform.log.error('[priceSensor] Failed to get price', err);
+        throw new this.platform.api.hap.HapStatusError(HAPStatus.SERVICE_COMMUNICATION_FAILURE);
+      }));
 
     // register task handlers
     platform.backgroundTasks.push(() => this.updateValue());
@@ -38,10 +41,10 @@ export class TibberPriceSensor {
 
   private updateValue(): void {
     this.platform.log.debug('Updating price in the background...');
-    this.getCurrentPrice().then(price => this.service.updateCharacteristic(this.platform.Characteristic.CurrentAmbientLightLevel, price));
-  }
-
-  async getCurrentPrice(): Promise<CharacteristicValue> {
-    return this.tibber.getCurrentPrice();
+    this.tibber.getCurrentPrice()
+      .then(price => this.service.updateCharacteristic(this.platform.Characteristic.CurrentAmbientLightLevel, price))
+      .catch(err => {
+        this.platform.log.error('[relativePriceSensor] Failed to update price in background', err);
+      });
   }
 }
