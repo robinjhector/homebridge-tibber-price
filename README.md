@@ -7,6 +7,7 @@ A simple homebridge plugin that will display prices from your Tibber account, in
 
 [!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://www.buymeacoffee.com/robinj)
 
+[![verified-by-homebridge](https://badgen.net/badge/homebridge/verified/purple)](https://github.com/homebridge/homebridge/wiki/Verified-Plugins)
 ![CI](https://github.com/robinjhector/homebridge-tibber-price/actions/workflows/build.yml/badge.svg?branch=master)
 
 ### Accessory: Actual price
