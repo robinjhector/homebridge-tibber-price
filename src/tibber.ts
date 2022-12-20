@@ -26,7 +26,6 @@ export class CachedTibberClient {
       active: true,
       apiEndpoint: {
         queryUrl: 'https://api.tibber.com/v1-beta/gql',
-        feedUrl: 'wss://api.tibber.com/v1-beta/gql/subscriptions',
         apiKey: config.accessToken,
       },
     });
