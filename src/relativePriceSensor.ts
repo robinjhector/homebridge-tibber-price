@@ -14,6 +14,7 @@ export class TibberRelativePriceSensor {
   constructor(
     private readonly platform: TibberPricePlatform,
     private readonly accessory: PlatformAccessory,
+    private readonly relativeFromLowestPoint: boolean,
   ) {
     this.tibber = platform.tibber!;
     // set accessory information
@@ -28,7 +29,7 @@ export class TibberRelativePriceSensor {
 
     // set handlers
     this.service.getCharacteristic(this.platform.Characteristic.CurrentRelativeHumidity)
-      .onGet(() => this.tibber.getCurrentPriceRelatively().catch(err => {
+      .onGet(() => this.tibber.getCurrentPriceRelatively(relativeFromLowestPoint).catch(err => {
         this.platform.log.error('[relativePriceSensor] Failed to get price', err);
         throw new this.platform.api.hap.HapStatusError(HAPStatus.SERVICE_COMMUNICATION_FAILURE);
       }));
@@ -39,7 +40,7 @@ export class TibberRelativePriceSensor {
 
   private updateValue(): void {
     this.platform.log.debug('Updating relative price in the background...');
-    this.tibber.getCurrentPriceRelatively()
+    this.tibber.getCurrentPriceRelatively(this.relativeFromLowestPoint)
       .then(perc => this.service.updateCharacteristic(this.platform.Characteristic.CurrentRelativeHumidity, perc))
       .catch(err => {
         this.platform.log.error('[relativePriceSensor] Failed to update price in background', err);

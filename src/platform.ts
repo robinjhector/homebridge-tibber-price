@@ -66,6 +66,7 @@ export class TibberPricePlatform implements DynamicPlatformPlugin {
     this.log.info('Registering devices...');
     this.registerDeregisterPriceSensor();
     this.registerDeregisterRelativePriceSensor();
+    this.registerDeregisterGaugePriceSensor();
     this.registerDeregisterPriceGraphing();
     this.log.info('Starting background tasks...');
 
@@ -108,10 +109,30 @@ export class TibberPricePlatform implements DynamicPlatformPlugin {
       this.log.info('Registering relative price sensor with id %s', uuid);
 
       if (existingAccessory) {
-        new TibberRelativePriceSensor(this, existingAccessory);
+        new TibberRelativePriceSensor(this, existingAccessory, false);
       } else {
         const priceSensorAccessory = new this.api.platformAccessory('Relative electricity price', uuid);
-        new TibberRelativePriceSensor(this, priceSensorAccessory);
+        new TibberRelativePriceSensor(this, priceSensorAccessory, false);
+        this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [priceSensorAccessory]);
+      }
+    } else if (existingAccessory) {
+      this.log.info('Removing relative price sensor with id %s', uuid);
+      this.api.unregisterPlatformAccessories(PLATFORM_NAME, PLATFORM_NAME, [existingAccessory]);
+    }
+  }
+
+  private registerDeregisterGaugePriceSensor() {
+    const uuid = this.api.hap.uuid.generate('hb-tb-price-gauge-price-sensor');
+    const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
+
+    if (this.config['activateGaugePriceSensor']) {
+      this.log.info('Registering gauge price sensor with id %s', uuid);
+
+      if (existingAccessory) {
+        new TibberRelativePriceSensor(this, existingAccessory, true);
+      } else {
+        const priceSensorAccessory = new this.api.platformAccessory('Electricity price gauge', uuid);
+        new TibberRelativePriceSensor(this, priceSensorAccessory, true);
         this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [priceSensorAccessory]);
       }
     } else if (existingAccessory) {

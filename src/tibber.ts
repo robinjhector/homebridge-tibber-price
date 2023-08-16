@@ -12,7 +12,7 @@ export class CachedTibberClient {
   private priceIncTax = true;
   private homeId?: string;
   public initiated = false;
-  public errorState = false;
+  public invalidConfig = false;
 
   constructor(
     private readonly platform: TibberPricePlatform,
@@ -43,7 +43,7 @@ export class CachedTibberClient {
           this.homeId = homeId;
         }).catch(err => {
           this.platform.log.error('Failed to query HomeId from Tibber, none of the accessories will work! See error:', err);
-          this.errorState = true;
+          this.invalidConfig = true;
         }).finally(() => this.initiated = true);
     } else {
       this.tibber.getHomes()
@@ -52,11 +52,11 @@ export class CachedTibberClient {
           const homeIdValid = homeIdsFromApi.find(hid => hid === this.homeId);
           if (!homeIdValid) {
             this.platform.log.error(`Incorrect HomeId in config. Was: '${this.homeId}', but expected one of: ${homeIdsFromApi}`);
-            this.errorState = true;
+            this.invalidConfig = true;
           }
         }).catch(err => {
           this.platform.log.error('Failed to validate HomeId from Tibber, none of the accessories will work! See error:', err);
-          this.errorState = true;
+          this.invalidConfig = true;
         }).finally(() => this.initiated = true);
       this.initiated = true;
     }
@@ -70,7 +70,7 @@ export class CachedTibberClient {
       .then(() => this.getPricesForHour(now));
   }
 
-  getCurrentPriceRelatively(): Promise<number> {
+  getCurrentPriceRelatively(relativeFromLowestPoint = false): Promise<number> {
     const forDateAndHour = new Date();
     return this.assertValidState()
       .then(() => this.getPricesForDay(forDateAndHour))
@@ -78,8 +78,12 @@ export class CachedTibberClient {
         const allPricesForToday = prices.map(price => fractionated(price, this.priceIncTax));
         const currIPrice = prices.find(price => dateHrEq(forDateAndHour, new Date(price.startsAt)))!;
         const currPrice = fractionated(currIPrice, this.priceIncTax);
+        const minPrice = Math.min(...allPricesForToday);
         const maxPrice = Math.max(...allPricesForToday);
 
+        if (relativeFromLowestPoint) {
+          return ((currPrice - minPrice) / (maxPrice - minPrice)) * 100;
+        }
         return (currPrice / maxPrice) * 100;
       });
   }
@@ -207,8 +211,8 @@ export class CachedTibberClient {
     if (!this.initiated) {
       return Promise.reject('Tibber client not initialised yet');
     }
-    if (this.errorState) {
-      return Promise.reject('The Tibber Client is in an error state. Check logs.');
+    if (this.invalidConfig) {
+      return Promise.reject('Invalid Tibber configuration. Check logs.');
     }
 
     return Promise.resolve();
