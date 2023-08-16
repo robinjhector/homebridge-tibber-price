@@ -40,8 +40,8 @@ export class TibberGraphing {
       this.platform.log.debug('Tibber client not yet initialised. Will try again later');
       return;
     }
-    if (this.tibber.errorState) {
-      this.platform.log.error('Cannot graph prices, Tibber client in an error state. Check the logs for errors');
+    if (this.tibber.invalidConfig) {
+      this.platform.log.error('Cannot graph prices, Invalid Tibber configuration. Check the logs for errors');
       return;
     }
 
