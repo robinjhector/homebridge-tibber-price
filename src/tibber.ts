@@ -108,6 +108,17 @@ export class CachedTibberClient {
       .then(prices => fractionated(findCurrentPrice(prices, now), this.priceIncTax));
   }
 
+  /**
+   * Tibber's price level for the current price (VERY_CHEAP, CHEAP, NORMAL, EXPENSIVE or VERY_EXPENSIVE), relative to the
+   * recent average price. Undefined if Tibber didn't provide one.
+   */
+  getCurrentPriceLevel(): Promise<string | undefined> {
+    const now = new Date();
+    return this.assertValidState()
+      .then(() => this.getPricesForDay(now))
+      .then(prices => findCurrentPrice(prices, now).level);
+  }
+
   getCurrentPriceRelatively(relativeFromLowestPoint = false): Promise<number> {
     const now = new Date();
     return this.assertValidState()

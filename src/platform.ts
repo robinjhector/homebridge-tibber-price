@@ -7,6 +7,7 @@ import {TibberPriceSensor} from './priceSensor';
 import {CachedTibberClient} from './tibber';
 import {TibberRelativePriceSensor} from './relativePriceSensor';
 import {TibberGraphing} from './graphing';
+import {TibberPriceLevelSensor} from './priceLevelSensor';
 
 const PRICE_INTERVAL_MS = 15 * 60 * 1000;
 
@@ -73,6 +74,7 @@ export class TibberPricePlatform implements DynamicPlatformPlugin {
     this.registerDeregisterPriceSensor();
     this.registerDeregisterRelativePriceSensor();
     this.registerDeregisterGaugePriceSensor();
+    this.registerDeregisterPriceLevelSensor();
     this.registerDeregisterPriceGraphing();
     this.log.info('Starting background tasks...');
 
@@ -159,6 +161,26 @@ export class TibberPricePlatform implements DynamicPlatformPlugin {
       }
     } else if (existingAccessory) {
       this.log.info('Removing gauge price sensor with id %s', uuid);
+      this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [existingAccessory]);
+    }
+  }
+
+  private registerDeregisterPriceLevelSensor() {
+    const uuid = this.api.hap.uuid.generate('hb-tb-price-level-sensor');
+    const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
+
+    if (this.config['activatePriceLevelSensor']) {
+      this.log.info('Registering price level sensor with id %s', uuid);
+
+      if (existingAccessory) {
+        new TibberPriceLevelSensor(this, existingAccessory);
+      } else {
+        const priceLevelAccessory = new this.api.platformAccessory('Electricity price level', uuid);
+        new TibberPriceLevelSensor(this, priceLevelAccessory);
+        this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [priceLevelAccessory]);
+      }
+    } else if (existingAccessory) {
+      this.log.info('Removing price level sensor with id %s', uuid);
       this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [existingAccessory]);
     }
   }

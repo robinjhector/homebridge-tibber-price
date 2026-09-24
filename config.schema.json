@@ -53,6 +53,13 @@
         "type": "boolean",
         "default": true,
         "required": false
+      },
+      "activatePriceLevelSensor": {
+        "title": "Price level sensor",
+        "description": "Register an \"AirQualitySensor\" that will show Tibber's price level for the current price, compared with the recent average price: very cheap = excellent, cheap = good, normal = fair, expensive = inferior, very expensive = poor. (Can be used for automation)",
+        "type": "boolean",
+        "default": true,
+        "required": false
       }
     }
   }

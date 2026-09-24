@@ -28,6 +28,20 @@ This accessory will manifest itself as a humidity sensor, since there is no "ene
 
 The accessory will display `%`. Can be hooked up to automation rules.
 
+### Accessory: Price level
+Shows Tibber's price level for the current price, which compares it with the recent average price.
+This accessory will manifest itself as an air quality sensor, since its five levels match Tibber's:
+
+| Tibber price level | Shown as air quality |
+|--------------------|----------------------|
+| Very cheap         | Excellent            |
+| Cheap              | Good                 |
+| Normal             | Fair                 |
+| Expensive          | Inferior             |
+| Very expensive     | Poor                 |
+
+Can be hooked up to automation rules.
+
 
 ### Price graphing
 The plugin can also generate a `.png` image, graphing todays prices (and tomorrows, if available).
@@ -49,6 +63,7 @@ But if you need to do it manually, here's a short description of the configurati
 | activatePriceGraphing       | boolean | no       | Enable price graphing (15-minute prices, saved as a PNG every hour)                                                                                                     |
 | activatePriceSensor         | boolean | no       | Enable the "light sensor" used for current electricty price                                                                                                             |
 | activateRelativePriceSensor | boolean | no       | Enable the "humidity sensor" used for current relative electricty price                                                                                                 |
+| activatePriceLevelSensor    | boolean | no       | Enable the "air quality sensor" used for the current price level                                                                                                        |
 
 #### Configuring ffmpeg camera plugin
 Configure the camera via Homebridge Config UI, and enter this under `Video Source`:
