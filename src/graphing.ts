@@ -4,8 +4,14 @@ import {clamp, dateHrEq, padTo2Digits} from './utils';
 import {CachedTibberClient, PricePoint} from './tibber';
 
 const HOUR_MS = 60 * 60 * 1000;
-// Today's line is coloured by price, in bands from the day's lowest price (first colour) to its highest (last colour)
-const PRICE_BANDS = ['#2e9e47', '#8db42c', '#f0a202', '#f07a1a', '#e73827', '#8E0E00'];
+// Today's line is coloured by Tibber's price level (relative to the recent average price)
+const PRICE_LEVELS = [
+  {level: 'VERY_CHEAP', label: 'Very cheap', color: '#2e9e47'},
+  {level: 'CHEAP', label: 'Cheap', color: '#8db42c'},
+  {level: 'NORMAL', label: 'Normal', color: '#f0a202'},
+  {level: 'EXPENSIVE', label: 'Expensive', color: '#e73827'},
+  {level: 'VERY_EXPENSIVE', label: 'Very expensive', color: '#8E0E00'},
+];
 
 export class TibberGraphing {
 
@@ -78,28 +84,38 @@ export function buildChartConfig(now: Date, today: PricePoint[], tomorrow?: Pric
   const lowest = today.reduce((min, point) => (point.price < min.price ? point : min), today[0]);
   const highest = today.reduce((max, point) => (point.price > max.price ? point : max), today[0]);
   const x = (point: PricePoint) => hoursSinceMidnight(point.startsAt);
+  const headroom = Math.max((highest.price - lowest.price) * 0.12, 2);
 
-  // Today's line is drawn as one dataset per price band, each in its own colour.
-  // (QuickChart doesn't let plugins draw, so a real gradient along the line isn't possible there.)
-  const datasets: object[] = priceBands(toSteps(today), lowest.price, highest.price).map((data, band) => ({
-    label: '',
-    data,
-    steppedLine: 'after',
-    spanGaps: false,
-    pointRadius: 0,
-    borderWidth: 3,
-    borderColor: PRICE_BANDS[band],
-    fill: false,
-  }));
-  // Only there for the legend
-  datasets.push({
-    label: 'Today',
-    data: [],
-    pointStyle: 'line',
-    borderWidth: 3,
-    borderColor: PRICE_BANDS[PRICE_BANDS.length - 2],
-    fill: false,
-  });
+  // Today's line is drawn as one dataset per price level, each in its own colour. (QuickChart doesn't let plugins
+  // draw, so colouring a single line isn't possible there.) Should Tibber not provide the levels, the line is
+  // coloured relative to the day's own lowest & highest price instead.
+  const levels = priceLevelsOf(today);
+  const byLevel = levels !== undefined;
+  const bandOf = levels ?? relativeBandsOf(today, lowest.price, highest.price);
+  const datasets: object[] = priceBands(toSteps(today), bandOf)
+    .map((data, band) => ({
+      label: byLevel ? PRICE_LEVELS[band].label : '',
+      data,
+      steppedLine: 'after',
+      spanGaps: false,
+      pointRadius: 0,
+      pointStyle: 'line',
+      borderWidth: 3,
+      borderColor: PRICE_LEVELS[band].color,
+      fill: false,
+    }))
+    .filter(dataset => dataset.data.length > 0);
+  if (!byLevel) {
+    // Only there for the legend
+    datasets.push({
+      label: 'Today',
+      data: [],
+      pointStyle: 'line',
+      borderWidth: 3,
+      borderColor: PRICE_LEVELS[3].color,
+      fill: false,
+    });
+  }
   if (hasTomorrow) {
     datasets.push({
       label: 'Tomorrow',
@@ -120,7 +136,7 @@ export function buildChartConfig(now: Date, today: PricePoint[], tomorrow?: Pric
     steppedLine: 'after',
     pointRadius: 0,
     borderWidth: 0,
-    backgroundColor: 'rgba(231, 56, 39, 0.06)',
+    backgroundColor: 'rgba(110, 116, 125, 0.07)',
     fill: 'origin',
   };
   // Markers on today's line: the current price, and the day's lowest & highest price. Hidden from the legend.
@@ -136,7 +152,11 @@ export function buildChartConfig(now: Date, today: PricePoint[], tomorrow?: Pric
     pointRadius: 7,
     pointBorderWidth: 3,
     pointBorderColor: 'white',
-    pointBackgroundColor: [...(current ? ['#333333'] : []), PRICE_BANDS[0], PRICE_BANDS[PRICE_BANDS.length - 1]],
+    pointBackgroundColor: [
+      ...(current ? ['#333333'] : []),
+      PRICE_LEVELS[bandOf[today.indexOf(lowest)]].color,
+      PRICE_LEVELS[bandOf[today.indexOf(highest)]].color,
+    ],
   }, wash);
 
   // The label sits on the opposite side of the chart from its marker, and just outside the day's price range
@@ -184,7 +204,9 @@ export function buildChartConfig(now: Date, today: PricePoint[], tomorrow?: Pric
           gridLines: {drawOnChartArea: false, color: 'rgba(0, 0, 0, 0.15)'},
         }],
         yAxes: [{
-          ticks: {fontSize: 18, fontColor: '#666666', maxTicksLimit: 6},
+          // Headroom above & below today's range, for the highest & lowest price labels
+          ticks: {fontSize: 18, fontColor: '#666666', maxTicksLimit: 6, suggestedMin: round2(lowest.price - headroom),
+            suggestedMax: round2(highest.price + headroom)},
           gridLines: {color: 'rgba(0, 0, 0, 0.06)', zeroLineColor: 'rgba(0, 0, 0, 0.3)', drawBorder: false},
         }],
       },
@@ -221,23 +243,37 @@ export function buildChartConfig(now: Date, today: PricePoint[], tomorrow?: Pric
 }
 
 /**
- * Splits the steps into one series per price band. Each step (and the jump to the next price) gets the colour of the
- * band its price falls in. Points of other bands are left out, with a gap (null) after each run.
+ * The index into PRICE_LEVELS of each point's Tibber price level, or undefined if any point lacks a known level.
  */
-function priceBands(steps: {x: number; y: number}[], lowest: number, highest: number): {x: number; y: number | null}[][] {
-  const bandOf = (price: number) => (highest > lowest
-    ? clamp(Math.floor(((price - lowest) / (highest - lowest)) * PRICE_BANDS.length), 0, PRICE_BANDS.length - 1)
-    : Math.floor(PRICE_BANDS.length / 2));
-  const bands: {x: number; y: number | null}[][] = PRICE_BANDS.map(() => []);
+function priceLevelsOf(points: PricePoint[]): number[] | undefined {
+  const bands = points.map(point => PRICE_LEVELS.findIndex(level => level.level === point.level));
+  return bands.includes(-1) ? undefined : bands;
+}
+
+/**
+ * Fallback: an index into PRICE_LEVELS for each point, relative to the day's own lowest & highest price.
+ */
+function relativeBandsOf(points: PricePoint[], lowest: number, highest: number): number[] {
+  return points.map(point => (highest > lowest
+    ? clamp(Math.floor(((point.price - lowest) / (highest - lowest)) * PRICE_LEVELS.length), 0, PRICE_LEVELS.length - 1)
+    : Math.floor(PRICE_LEVELS.length / 2)));
+}
+
+/**
+ * Splits the steps into one series per price band, given the band of each point. Each step (and the jump to the next
+ * price) gets the colour of its point's band. Points of other bands are left out, with a gap (null) after each run.
+ */
+function priceBands(steps: {x: number; y: number}[], bandOf: number[]): {x: number; y: number | null}[][] {
+  const bands: {x: number; y: number | null}[][] = PRICE_LEVELS.map(() => []);
   for (let i = 0; i < steps.length - 1; i++) {
-    const band = bands[bandOf(steps[i].y)];
+    const band = bands[bandOf[i]];
     const previous = band[band.length - 1];
     if (!previous || previous.x !== steps[i].x || previous.y === null) {
       band.push(steps[i]);
     }
     band.push(steps[i + 1]);
     // End the run unless the next step is in the same band
-    if (i + 1 < steps.length - 1 && bandOf(steps[i + 1].y) !== bandOf(steps[i].y)) {
+    if (i + 1 < steps.length - 1 && bandOf[i + 1] !== bandOf[i]) {
       band.push({x: steps[i + 1].x, y: null});
     }
   }
