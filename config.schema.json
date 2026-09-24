@@ -33,6 +33,13 @@
         "default": true,
         "required": false
       },
+      "priceGraphDarkMode": {
+        "title": "Price graph dark mode",
+        "description": "Render the price graph with a dark background and light text, e.g. to match the Home app in dark mode",
+        "type": "boolean",
+        "default": false,
+        "required": false
+      },
       "activatePriceSensor": {
         "title": "Actual price sensor",
         "description": "Register a \"Light sensor\" that will show the current electricity price (in the smallest currency format) as LUX level. (Can be used for automation)",
