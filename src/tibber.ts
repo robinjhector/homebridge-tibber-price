@@ -2,12 +2,12 @@ import {TibberQuery} from 'tibber-api';
 import {TibberPricePlatform, TypedConfig} from './platform';
 import {IPrice} from 'tibber-api/lib/src/models/IPrice';
 import fs from 'fs';
-import {clamp, dateEq, dateHrEq, formatDate, fractionated} from './utils';
+import {clamp, dateEq, formatDate, fractionated} from './utils';
 import {PLUGIN_NAME} from './settings';
 
-// The sensors & graph are built around one price per hour, so explicitly ask for that
-// (Tibber also offers QUARTER_HOURLY since the move to 15-minute spot prices)
-const PRICE_RESOLUTION = 'HOURLY';
+// Spot prices are set per 15 minutes (since the move to 15-minute market time units in October 2025)
+const PRICE_RESOLUTION = 'QUARTER_HOURLY';
+const PRICE_FILE = /^(prices-)?(\d{4}-\d{2}-\d{2})\.json$/;
 const INIT_RETRY_MIN_MS = 30 * 1000;
 const INIT_RETRY_MAX_MS = 15 * 60 * 1000;
 
@@ -20,6 +20,7 @@ export class CachedTibberClient {
   private priceIncTax = true;
   private homeId?: string;
   private initRetryMs = INIT_RETRY_MIN_MS;
+  private readonly readyListeners: (() => void)[] = [];
   public initiated = false;
   public invalidConfig = false;
 
@@ -31,7 +32,7 @@ export class CachedTibberClient {
     this.cache = new Map();
     this.inFlight = new Map();
     this.homeId = config.homeId;
-    this.priceIncTax = config.priceIncTax === true;
+    this.priceIncTax = config.priceIncTax !== false;
     this.tibber = new TibberQuery({
       active: true,
       apiEndpoint: {
@@ -56,6 +57,7 @@ export class CachedTibberClient {
     init
       .then(() => {
         this.initiated = true;
+        this.readyListeners.forEach(listener => listener());
       })
       .catch(err => {
         this.platform.log.error(`Failed to reach Tibber, will retry in ${this.initRetryMs / 1000}s. See error:`, err);
@@ -88,20 +90,31 @@ export class CachedTibberClient {
     });
   }
 
+  /**
+   * Calls the listener once the client is initiated (or immediately, if it already is).
+   */
+  onReady(listener: () => void): void {
+    if (this.initiated) {
+      listener();
+    } else {
+      this.readyListeners.push(listener);
+    }
+  }
+
   getCurrentPrice(): Promise<number> {
     const now = new Date();
     return this.assertValidState()
       .then(() => this.getPricesForDay(now))
-      .then(prices => fractionated(findPriceForHour(prices, now), this.priceIncTax));
+      .then(prices => fractionated(findCurrentPrice(prices, now), this.priceIncTax));
   }
 
   getCurrentPriceRelatively(relativeFromLowestPoint = false): Promise<number> {
-    const forDateAndHour = new Date();
+    const now = new Date();
     return this.assertValidState()
-      .then(() => this.getPricesForDay(forDateAndHour))
+      .then(() => this.getPricesForDay(now))
       .then(prices => {
         const allPricesForToday = prices.map(price => fractionated(price, this.priceIncTax));
-        const currPrice = fractionated(findPriceForHour(prices, forDateAndHour), this.priceIncTax);
+        const currPrice = fractionated(findCurrentPrice(prices, now), this.priceIncTax);
         const minPrice = Math.min(...allPricesForToday);
         const maxPrice = Math.max(...allPricesForToday);
 
@@ -119,21 +132,27 @@ export class CachedTibberClient {
       });
   }
 
-  getTodaysPrices(): Promise<number[]> {
+  getTodaysPrices(): Promise<PricePoint[]> {
     const today = new Date();
     return this.assertValidState()
       .then(() => this.getPricesForDay(today))
-      .then(prices => prices.map(price => fractionated(price, this.priceIncTax)));
+      .then(prices => this.toPricePoints(prices));
   }
 
-  getTomorrowsPrices(): Promise<number[]> {
+  getTomorrowsPrices(): Promise<PricePoint[]> {
     const today = new Date();
     const tomorrow = new Date(today);
     tomorrow.setDate(today.getDate() + 1);
 
     return this.assertValidState()
       .then(() => this.getPricesForDay(tomorrow))
-      .then(prices => prices.map(price => fractionated(price, this.priceIncTax)));
+      .then(prices => this.toPricePoints(prices));
+  }
+
+  private toPricePoints(prices: IPrice[]): PricePoint[] {
+    return prices
+      .filter(price => price.startsAt)
+      .map(price => ({startsAt: new Date(price.startsAt!), price: fractionated(price, this.priceIncTax)}));
   }
 
   private getPricesForDay(forDate: Date): Promise<IPrice[]> {
@@ -143,7 +162,7 @@ export class CachedTibberClient {
       return Promise.resolve(cached);
     }
 
-    // Several sensors ask for the same day at once (on startup / every minute), only hit the disk & API once.
+    // Several sensors ask for the same day at once, only hit the disk & API once.
     let pending = this.inFlight.get(key);
     if (!pending) {
       pending = this.getPricesFromFile(forDate)
@@ -157,7 +176,7 @@ export class CachedTibberClient {
   private getPricesFromFile(forDate: Date): Promise<IPrice[]> {
     this.platform.log.debug('Getting prices from file');
     const key = formatDate(forDate);
-    const file = this.path + '/' + key + '.json';
+    const file = this.priceFile(key);
     return fs.promises.readFile(file)
       .then(data => {
         const prices = JSON.parse(data.toString()) as IPrice[];
@@ -206,13 +225,43 @@ export class CachedTibberClient {
 
   private persistPrices(forDate: Date, newPrices: IPrice[]): Promise<IPrice[]> {
     const key = formatDate(forDate);
-    const file = this.path + '/' + key + '.json';
+    const file = this.priceFile(key);
     // Keep the prices in memory even if they can't be written to disk
     this.cache.set(key, newPrices);
     return fs.promises.writeFile(file, JSON.stringify(newPrices))
       .then(() => this.platform.log.info('Stored price information for', key))
       .catch(err => this.platform.log.error('Failed to persist prices to disk', err))
+      .then(() => this.removeOldPrices())
       .then(() => newPrices);
+  }
+
+  private priceFile(key: string): string {
+    // Named "prices-<date>.json" since 15-minute prices, so hourly files from older versions are never read
+    return `${this.path}/prices-${key}.json`;
+  }
+
+  /**
+   * Only today's & tomorrow's prices are ever used, drop everything older (on disk & in memory).
+   */
+  private removeOldPrices(): Promise<void> {
+    const today = formatDate(new Date());
+    const isOld = (key: string) => key < today;
+    for (const key of this.cache.keys()) {
+      if (isOld(key)) {
+        this.cache.delete(key);
+      }
+    }
+    return fs.promises.readdir(this.path)
+      .then(files => Promise.all(files
+        .filter(file => {
+          const match = PRICE_FILE.exec(file);
+          // Files without the "prices-" prefix are hourly prices from older versions of this plugin
+          return match && (!match[1] || isOld(match[2]));
+        })
+        .map(file => fs.promises.unlink(`${this.path}/${file}`)
+          .then(() => this.platform.log.debug('Removed old price file', file)))))
+      .then(() => undefined)
+      .catch(err => this.platform.log.warn('Failed to remove old price files', err));
   }
 
   private assertValidState(): Promise<unknown> {
@@ -227,10 +276,27 @@ export class CachedTibberClient {
   }
 }
 
-function findPriceForHour(prices: IPrice[], forDateAndHour: Date): IPrice {
-  const price = prices.find(price => price.startsAt && dateHrEq(forDateAndHour, new Date(price.startsAt)));
-  if (!price) {
-    throw new Error('No price found for ' + forDateAndHour.toISOString());
+export interface PricePoint {
+  startsAt: Date;
+  /** In the smallest currency unit (öre, cents etc) */
+  price: number;
+}
+
+/**
+ * Finds the price for the interval (15 minutes, or an hour) that `now` falls within.
+ */
+function findCurrentPrice(prices: IPrice[], now: Date): IPrice {
+  const starts = prices.map(price => (price.startsAt ? new Date(price.startsAt).getTime() : NaN));
+  for (let i = starts.length - 1; i >= 0; i--) {
+    if (starts[i] > now.getTime()) {
+      continue;
+    }
+    // Each interval lasts until the next one starts. The last one lasts as long as the one before it.
+    const length = i + 1 < starts.length ? starts[i + 1] - starts[i] : starts[i] - starts[i - 1];
+    if (now.getTime() < starts[i] + (length || 15 * 60 * 1000)) {
+      return prices[i];
+    }
+    break;
   }
-  return price;
+  throw new Error('No price found for ' + now.toISOString());
 }

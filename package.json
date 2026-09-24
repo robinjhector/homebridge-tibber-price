@@ -2,7 +2,7 @@
   "displayName": "Homebridge Tibber Price",
   "name": "homebridge-tibber-price",
   "version": "2.0.0",
-  "description": "Functionality based on Tibber Price (Hourly spot prices). Graphing & sensors for automation",
+  "description": "Functionality based on Tibber Price (15-minute spot prices). Graphing & sensors for automation",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",

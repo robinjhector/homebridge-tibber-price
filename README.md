@@ -45,8 +45,8 @@ But if you need to do it manually, here's a short description of the configurati
 | platform                    | string  | YES      | Should be `HomebridgeTibberPrice`                                                                                                                                       |
 | accessToken                 | string  | YES      | Should be your Tibber API key                                                                                                                                           |
 | homeId                      | string  | no       | If you only have one house/home in Tibber, you can ignore this. However, if you have multiple, you should enter your HomeId here, to get the correct price information. |
-| priceIncTax                 | boolean | no       | Show prices with tax/vat included                                                                                                                                       |
-| activatePriceGraphing       | boolean | no       | Enable price graphing (Saved as a PNG every hour)                                                                                                                       |
+| priceIncTax                 | boolean | no       | Show prices with tax/vat included (default: `true`)                                                                                                                     |
+| activatePriceGraphing       | boolean | no       | Enable price graphing (15-minute prices, saved as a PNG every hour)                                                                                                     |
 | activatePriceSensor         | boolean | no       | Enable the "light sensor" used for current electricty price                                                                                                             |
 | activateRelativePriceSensor | boolean | no       | Enable the "humidity sensor" used for current relative electricty price                                                                                                 |
 

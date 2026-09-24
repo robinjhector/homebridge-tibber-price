@@ -8,6 +8,8 @@ import {CachedTibberClient} from './tibber';
 import {TibberRelativePriceSensor} from './relativePriceSensor';
 import {TibberGraphing} from './graphing';
 
+const PRICE_INTERVAL_MS = 15 * 60 * 1000;
+
 /**
  * HomebridgePlatform
  * This class is the main constructor for your plugin, this is where you should
@@ -74,14 +76,31 @@ export class TibberPricePlatform implements DynamicPlatformPlugin {
     this.registerDeregisterPriceGraphing();
     this.log.info('Starting background tasks...');
 
-    setInterval(() => {
-      for (const backgroundTask of this.backgroundTasks) {
-        // Tasks may be async, make sure a rejection never goes unhandled (that would crash Homebridge)
-        Promise.resolve()
-          .then(() => backgroundTask())
-          .catch(err => this.log.error('Failed to perform background task!', err));
-      }
-    }, 1000 * 60);
+    // Run once as soon as prices can be fetched, then whenever a new price interval starts
+    this.tibber?.onReady(() => this.runBackgroundTasks());
+    this.scheduleBackgroundTasks();
+  }
+
+  /**
+   * Prices change every 15 minutes (on :00, :15, :30 and :45), so there's no point in updating more often than that.
+   */
+  private scheduleBackgroundTasks() {
+    const now = Date.now();
+    // A few seconds past the boundary, so the new interval has certainly started
+    const next = Math.floor(now / PRICE_INTERVAL_MS) * PRICE_INTERVAL_MS + PRICE_INTERVAL_MS + 5000;
+    setTimeout(() => {
+      this.runBackgroundTasks();
+      this.scheduleBackgroundTasks();
+    }, next - now);
+  }
+
+  private runBackgroundTasks() {
+    for (const backgroundTask of this.backgroundTasks) {
+      // Tasks may be async, make sure a rejection never goes unhandled (that would crash Homebridge)
+      Promise.resolve()
+        .then(() => backgroundTask())
+        .catch(err => this.log.error('Failed to perform background task!', err));
+    }
   }
 
   private registerDeregisterPriceSensor() {
