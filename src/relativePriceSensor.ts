@@ -1,4 +1,4 @@
-import {HAPStatus, PlatformAccessory, Service} from 'homebridge';
+import type {PlatformAccessory, Service} from 'homebridge' with {'resolution-mode': 'import'};
 
 import {TibberPricePlatform} from './platform';
 import {CachedTibberClient} from './tibber';
@@ -31,7 +31,7 @@ export class TibberRelativePriceSensor {
     this.service.getCharacteristic(this.platform.Characteristic.CurrentRelativeHumidity)
       .onGet(() => this.tibber.getCurrentPriceRelatively(relativeFromLowestPoint).catch(err => {
         this.platform.log.error('[relativePriceSensor] Failed to get price', err);
-        throw new this.platform.api.hap.HapStatusError(HAPStatus.SERVICE_COMMUNICATION_FAILURE);
+        throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
       }));
 
     // register task handlers

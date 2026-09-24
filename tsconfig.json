@@ -1,7 +1,8 @@
 {
   "compilerOptions": {
-    "target": "ES2022", // node 20+
-    "module": "commonjs",
+    "target": "ES2022", // node 22+
+    "module": "node16", // CommonJS output, but understands ESM packages like homebridge 2
+    "moduleResolution": "node16",
     "lib": [
       "ES2022"
     ],
@@ -12,7 +13,8 @@
     "rootDir": "./src",
     "strict": true,
     "esModuleInterop": true,
-    "noImplicitAny": false
+    "noImplicitAny": false,
+    "skipLibCheck": true // homebridge 2 ships Matter typings that do not type-check on their own
   },
   "include": [
     "src/"

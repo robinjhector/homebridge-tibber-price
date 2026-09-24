@@ -10,6 +10,12 @@ A simple homebridge plugin that will display prices from your Tibber account, in
 [![verified-by-homebridge](https://badgen.net/badge/homebridge/verified/purple)](https://github.com/homebridge/homebridge/wiki/Verified-Plugins)
 ![CI](https://github.com/robinjhector/homebridge-tibber-price/actions/workflows/build.yml/badge.svg?branch=master)
 
+### Requirements
+- Homebridge `1.8` or newer, including Homebridge `2.x`
+- Node.js `22`, `24` or `26`
+
+Still on Node.js 20? Stay on `1.2.0` of this plugin until you've upgraded Node.js.
+
 ### Accessory: Actual price
 Shows the price, in the smallest denominator of the currency (öre, cents, etc).
 This accessory will manifest itself as a light sensor, since there is no "energy meter" accessory type in Apple Home. 
