@@ -6,6 +6,9 @@ src
 # gitHub actions
 .github
 
+# maintainer docs
+RELEASING.md
+
 # claude code
 .claude
 
