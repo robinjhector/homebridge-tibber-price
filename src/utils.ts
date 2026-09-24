@@ -25,5 +25,12 @@ export function dateHrEq(d1: Date, d2: Date): boolean {
 }
 
 export function fractionated(price: IPrice, incTax: boolean): number {
-  return (incTax ? price.total : price.total - price.tax) * 100;
+  if (typeof price.total !== 'number') {
+    throw new Error('Price is missing a total: ' + JSON.stringify(price));
+  }
+  return (incTax ? price.total : price.total - (price.tax ?? 0)) * 100;
+}
+
+export function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
 }

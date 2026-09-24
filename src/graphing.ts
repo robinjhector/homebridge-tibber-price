@@ -1,7 +1,6 @@
 import {TibberPricePlatform} from './platform';
 import fs from 'fs';
 import {dateHrEq, padTo2Digits} from './utils';
-import axios from 'axios';
 import {CachedTibberClient} from './tibber';
 
 export class TibberGraphing {
@@ -22,10 +21,16 @@ export class TibberGraphing {
     this.tibber = platform.tibber!;
 
     // Tibber Client will probably not be initialised, so wait 5s before drawing the first chart
-    setTimeout(() => this.graphIt(), 5000);
-    this.platform.backgroundTasks.push(() => this.graphIt());
+    setTimeout(() => this.graphItSafely(), 5000);
+    this.platform.backgroundTasks.push(() => this.graphItSafely());
 
     this.platform.log.info('Will produce a chart PNG, stored at:', this.path);
+  }
+
+  private graphItSafely(): Promise<void> {
+    return this.graphIt().catch(err => {
+      this.platform.log.error('Failed to generate price chart:', err?.message ?? err);
+    });
   }
 
   private async graphIt() {
@@ -146,13 +151,20 @@ export class TibberGraphing {
       chart: chartDataB64,
     };
 
-    const response = await axios.post(
-      'https://quickchart.io/chart',
-      request,
-      {headers: {'Content-Type': 'application/json'}, responseType: 'stream'},
-    );
+    const response = await fetch('https://quickchart.io/chart', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(request),
+      signal: AbortSignal.timeout(30 * 1000),
+    });
+    if (!response.ok) {
+      throw new Error(`QuickChart responded with ${response.status} ${response.statusText}`);
+    }
 
-    response.data.pipe(fs.createWriteStream(this.path));
+    // Write to a temp file first, so consumers (e.g. camera-ffmpeg) never read a half written image
+    const tmpPath = this.path + '.tmp';
+    await fs.promises.writeFile(tmpPath, Buffer.from(await response.arrayBuffer()));
+    await fs.promises.rename(tmpPath, this.path);
     this.platform.log.debug('Wrote chart to file');
     this.lastRender = new Date();
   }
