@@ -33,6 +33,13 @@
         "default": true,
         "required": false
       },
+      "priceGraphDarkMode": {
+        "title": "Price graph dark mode",
+        "description": "Render the price graph with a dark background and light text, e.g. to match the Home app in dark mode",
+        "type": "boolean",
+        "default": false,
+        "required": false
+      },
       "activatePriceSensor": {
         "title": "Actual price sensor",
         "description": "Register a \"Light sensor\" that will show the current electricity price (in the smallest currency format) as LUX level. (Can be used for automation)",
@@ -50,6 +57,13 @@
       "activateGaugePriceSensor": {
         "title": "Gauge price sensor",
         "description": "Register a \"HumiditySensor\" that will show an absolute value between 0 - 100. Zero if the price is at the lowest point of the day, and 100 if it is at its highest. And anything in between. (Can be used for automation)",
+        "type": "boolean",
+        "default": true,
+        "required": false
+      },
+      "activatePriceLevelSensor": {
+        "title": "Price level sensor",
+        "description": "Register an \"AirQualitySensor\" that will show Tibber's price level for the current price, compared with the recent average price: very cheap = excellent, cheap = good, normal = fair, expensive = inferior, very expensive = poor. (Can be used for automation)",
         "type": "boolean",
         "default": true,
         "required": false

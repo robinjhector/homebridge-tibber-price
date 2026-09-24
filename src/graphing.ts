@@ -4,14 +4,73 @@ import {clamp, dateHrEq, padTo2Digits} from './utils';
 import {CachedTibberClient, PricePoint} from './tibber';
 
 const HOUR_MS = 60 * 60 * 1000;
-// Today's line is coloured by Tibber's price level (relative to the recent average price)
+// Today's line is coloured by Tibber's price level (relative to the recent average price), cheapest first
 const PRICE_LEVELS = [
-  {level: 'VERY_CHEAP', label: 'Very cheap', color: '#2e9e47'},
-  {level: 'CHEAP', label: 'Cheap', color: '#8db42c'},
-  {level: 'NORMAL', label: 'Normal', color: '#f0a202'},
-  {level: 'EXPENSIVE', label: 'Expensive', color: '#e73827'},
-  {level: 'VERY_EXPENSIVE', label: 'Very expensive', color: '#8E0E00'},
+  {level: 'VERY_CHEAP', label: 'Very cheap'},
+  {level: 'CHEAP', label: 'Cheap'},
+  {level: 'NORMAL', label: 'Normal'},
+  {level: 'EXPENSIVE', label: 'Expensive'},
+  {level: 'VERY_EXPENSIVE', label: 'Very expensive'},
 ];
+
+export interface ChartTheme {
+  background: string;
+  /** One per PRICE_LEVELS entry */
+  levels: string[];
+  title: string;
+  text: string;
+  ticks: string;
+  grid: string;
+  axis: string;
+  zeroLine: string;
+  referenceLine: string;
+  labelBackground: string;
+  nowLine: string;
+  nowLabelBackground: string;
+  nowLabelText: string;
+  currentMarker: string;
+  tomorrow: string;
+  wash: string;
+}
+
+export const LIGHT_THEME: ChartTheme = {
+  background: 'white',
+  levels: ['#2e9e47', '#8db42c', '#f0a202', '#e73827', '#8E0E00'],
+  title: '#222222',
+  text: '#444444',
+  ticks: '#666666',
+  grid: 'rgba(0, 0, 0, 0.06)',
+  axis: 'rgba(0, 0, 0, 0.15)',
+  zeroLine: 'rgba(0, 0, 0, 0.3)',
+  referenceLine: 'rgba(0, 0, 0, 0.12)',
+  labelBackground: 'rgba(255, 255, 255, 0.85)',
+  nowLine: 'rgba(51, 51, 51, 0.6)',
+  nowLabelBackground: 'rgba(51, 51, 51, 0.85)',
+  nowLabelText: '#ffffff',
+  currentMarker: '#333333',
+  tomorrow: 'rgba(110, 116, 125, 0.85)',
+  wash: 'rgba(110, 116, 125, 0.07)',
+};
+
+export const DARK_THEME: ChartTheme = {
+  background: '#1c1f24',
+  // The two most expensive levels are brighter than in the light theme, dark red would disappear on a dark background
+  levels: ['#2e9e47', '#8db42c', '#f0a202', '#ff7a2e', '#ff3b30'],
+  title: '#f2f3f5',
+  text: '#d6d9de',
+  ticks: '#aab0b9',
+  grid: 'rgba(255, 255, 255, 0.07)',
+  axis: 'rgba(255, 255, 255, 0.2)',
+  zeroLine: 'rgba(255, 255, 255, 0.35)',
+  referenceLine: 'rgba(255, 255, 255, 0.18)',
+  labelBackground: 'rgba(28, 31, 36, 0.85)',
+  nowLine: 'rgba(242, 243, 245, 0.55)',
+  nowLabelBackground: 'rgba(242, 243, 245, 0.9)',
+  nowLabelText: '#1c1f24',
+  currentMarker: '#f2f3f5',
+  tomorrow: 'rgba(170, 176, 186, 0.8)',
+  wash: 'rgba(255, 255, 255, 0.05)',
+};
 
 export class TibberGraphing {
 
@@ -63,7 +122,8 @@ export class TibberGraphing {
     this.lastAttempt = now;
     this.lastAttemptHadTomorrow = !!tomorrow;
 
-    const png = await renderChart(buildChartConfig(now, today, tomorrow));
+    const theme = this.platform.config['priceGraphDarkMode'] ? DARK_THEME : LIGHT_THEME;
+    const png = await renderChart(buildChartConfig(now, today, tomorrow, theme), theme.background);
 
     // Write to a temp file first, so consumers (e.g. camera-ffmpeg) never read a half written image
     const tmpPath = this.path + '.tmp';
@@ -78,7 +138,7 @@ export class TibberGraphing {
  * Builds a Chart.js v2 config (QuickChart's default version). It's a JS string rather than JSON, since it calls
  * QuickChart's gradient helper and contains a few callbacks.
  */
-export function buildChartConfig(now: Date, today: PricePoint[], tomorrow?: PricePoint[]): string {
+export function buildChartConfig(now: Date, today: PricePoint[], tomorrow?: PricePoint[], theme = LIGHT_THEME): string {
   const hasTomorrow = !!tomorrow && tomorrow.length > 0;
   const current = [...today].reverse().find(point => point.startsAt <= now);
   const lowest = today.reduce((min, point) => (point.price < min.price ? point : min), today[0]);
@@ -101,7 +161,7 @@ export function buildChartConfig(now: Date, today: PricePoint[], tomorrow?: Pric
       pointRadius: 0,
       pointStyle: 'line',
       borderWidth: 3,
-      borderColor: PRICE_LEVELS[band].color,
+      borderColor: theme.levels[band],
       fill: false,
     }))
     .filter(dataset => dataset.data.length > 0);
@@ -112,7 +172,7 @@ export function buildChartConfig(now: Date, today: PricePoint[], tomorrow?: Pric
       data: [],
       pointStyle: 'line',
       borderWidth: 3,
-      borderColor: PRICE_LEVELS[3].color,
+      borderColor: theme.levels[3],
       fill: false,
     });
   }
@@ -125,7 +185,7 @@ export function buildChartConfig(now: Date, today: PricePoint[], tomorrow?: Pric
       pointStyle: 'line',
       borderWidth: 2,
       borderDash: [8, 5],
-      borderColor: 'rgba(110, 116, 125, 0.85)',
+      borderColor: theme.tomorrow,
       fill: false,
     });
   }
@@ -136,7 +196,7 @@ export function buildChartConfig(now: Date, today: PricePoint[], tomorrow?: Pric
     steppedLine: 'after',
     pointRadius: 0,
     borderWidth: 0,
-    backgroundColor: 'rgba(110, 116, 125, 0.07)',
+    backgroundColor: theme.wash,
     fill: 'origin',
   };
   // Markers on today's line: the current price, and the day's lowest & highest price. Hidden from the legend.
@@ -151,11 +211,11 @@ export function buildChartConfig(now: Date, today: PricePoint[], tomorrow?: Pric
     fill: false,
     pointRadius: 7,
     pointBorderWidth: 3,
-    pointBorderColor: 'white',
+    pointBorderColor: theme.background,
     pointBackgroundColor: [
-      ...(current ? ['#333333'] : []),
-      PRICE_LEVELS[bandOf[today.indexOf(lowest)]].color,
-      PRICE_LEVELS[bandOf[today.indexOf(highest)]].color,
+      ...(current ? [theme.currentMarker] : []),
+      theme.levels[bandOf[today.indexOf(lowest)]],
+      theme.levels[bandOf[today.indexOf(highest)]],
     ],
   }, wash);
 
@@ -166,14 +226,14 @@ export function buildChartConfig(now: Date, today: PricePoint[], tomorrow?: Pric
     mode: 'horizontal',
     scaleID: 'y-axis-0',
     value: round2(point.price),
-    borderColor: 'rgba(0, 0, 0, 0.12)',
+    borderColor: theme.referenceLine,
     borderWidth: 1,
     label: {
       enabled: true,
       position: x(point) < 12 ? 'right' : 'left',
       yAdjust: above ? -18 : 18,
-      backgroundColor: 'rgba(255, 255, 255, 0.85)',
-      fontColor: '#444444',
+      backgroundColor: theme.labelBackground,
+      fontColor: theme.text,
       fontSize: 18,
       fontStyle: 'normal',
       content: `${text} ${Math.round(point.price)} at ${formatTime(point.startsAt)}`,
@@ -189,25 +249,25 @@ export function buildChartConfig(now: Date, today: PricePoint[], tomorrow?: Pric
         display: true,
         text: 'Electricity price · ' + now.toLocaleDateString('en-GB', {weekday: 'long', day: 'numeric', month: 'long'}),
         fontSize: 28,
-        fontColor: '#222222',
+        fontColor: theme.title,
         padding: 16,
       },
       legend: {
         position: 'top',
         align: 'end',
-        labels: {fontSize: 18, fontColor: '#444444', usePointStyle: true, filter: '<LEGEND_FILTER>'},
+        labels: {fontSize: 18, fontColor: theme.text, usePointStyle: true, filter: '<LEGEND_FILTER>'},
       },
       scales: {
         xAxes: [{
           type: 'linear',
-          ticks: {min: 0, max: 24, stepSize: 1, fontSize: 18, fontColor: '#666666', callback: '<HOUR_TICK>'},
-          gridLines: {drawOnChartArea: false, color: 'rgba(0, 0, 0, 0.15)'},
+          ticks: {min: 0, max: 24, stepSize: 1, fontSize: 18, fontColor: theme.ticks, callback: '<HOUR_TICK>'},
+          gridLines: {drawOnChartArea: false, color: theme.axis},
         }],
         yAxes: [{
           // Headroom above & below today's range, for the highest & lowest price labels
-          ticks: {fontSize: 18, fontColor: '#666666', maxTicksLimit: 6, suggestedMin: round2(lowest.price - headroom),
+          ticks: {fontSize: 18, fontColor: theme.ticks, maxTicksLimit: 6, suggestedMin: round2(lowest.price - headroom),
             suggestedMax: round2(highest.price + headroom)},
-          gridLines: {color: 'rgba(0, 0, 0, 0.06)', zeroLineColor: 'rgba(0, 0, 0, 0.3)', drawBorder: false},
+          gridLines: {color: theme.grid, zeroLineColor: theme.zeroLine, drawBorder: false},
         }],
       },
       annotation: {
@@ -220,12 +280,13 @@ export function buildChartConfig(now: Date, today: PricePoint[], tomorrow?: Pric
             mode: 'vertical',
             scaleID: 'x-axis-0',
             value: hoursSinceMidnight(now),
-            borderColor: 'rgba(51, 51, 51, 0.6)',
+            borderColor: theme.nowLine,
             borderWidth: 2,
             label: {
               enabled: current !== undefined,
               position: 'top',
-              backgroundColor: 'rgba(51, 51, 51, 0.85)',
+              backgroundColor: theme.nowLabelBackground,
+              fontColor: theme.nowLabelText,
               fontSize: 22,
               fontStyle: 'bold',
               yAdjust: 8,
@@ -280,12 +341,12 @@ function priceBands(steps: {x: number; y: number}[], bandOf: number[]): {x: numb
   return bands;
 }
 
-async function renderChart(chart: string): Promise<Buffer> {
+async function renderChart(chart: string, background: string): Promise<Buffer> {
   const response = await fetch('https://quickchart.io/chart', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({
-      backgroundColor: 'white',
+      backgroundColor: background,
       width: 1280,
       height: 720,
       format: 'png',
