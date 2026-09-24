@@ -6,7 +6,7 @@
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "git@github.com:robinjhector/homebridge-tibber-price.git"
+    "url": "git+https://github.com/robinjhector/homebridge-tibber-price.git"
   },
   "bugs": {
     "url": "https://github.com/robinjhector/homebridge-tibber-price/issues"

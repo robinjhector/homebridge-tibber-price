@@ -1,0 +1,63 @@
+# Publishes the package to npm when a GitHub release is published.
+#
+# To release:
+#   1. Bump "version" in package.json (e.g. `npm version 2.1.0 --no-git-tag-version`),
+#      commit it as "Release vX.Y.Z" and push to master.
+#   2. Create a GitHub release with the tag set to that same version (e.g. `2.1.0`),
+#      targeting master. Mark it as a pre-release to publish under the npm `beta` tag.
+#
+# Authentication uses npm trusted publishing (OIDC), so no npm token is stored in the repo.
+# One-time setup on npmjs.com: package settings -> Trusted Publisher -> GitHub Actions,
+# with owner `robinjhector`, repository `homebridge-tibber-price` and workflow `release.yml`.
+
+name: Release
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+  id-token: write # required for npm trusted publishing
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Use Node.js 24.x
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24.x
+          registry-url: https://registry.npmjs.org
+          cache: npm
+
+      # Trusted publishing needs npm 11.5.1 or newer
+      - name: Update npm
+        run: npm install -g npm@^11.5.1
+
+      - name: Check that the release tag matches package.json
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          if [ "${TAG#v}" != "$VERSION" ]; then
+            echo "::error::Release tag '$TAG' does not match package.json version '$VERSION'"
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: npm ci
+
+      # prepublishOnly runs lint + build
+      - name: Publish to npm
+        env:
+          PRERELEASE: ${{ github.event.release.prerelease }}
+        run: |
+          if [ "$PRERELEASE" = "true" ]; then
+            npm publish --tag beta
+          else
+            npm publish
+          fi

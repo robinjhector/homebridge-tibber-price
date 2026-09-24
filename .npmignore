@@ -6,6 +6,9 @@ src
 # gitHub actions
 .github
 
+# claude code
+.claude
+
 # eslint
 eslint.config.mjs
 
