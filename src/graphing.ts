@@ -204,22 +204,36 @@ export function buildChartConfig(now: Date, today: PricePoint[], tomorrow?: Pric
 }
 
 /**
- * An inline Chart.js plugin that colours today's line (dataset 0) by price. Once the y-axis is laid out, it spans a
- * gradient from the pixel of the day's highest price to that of its lowest, so the colours follow the prices exactly.
+ * An inline Chart.js plugin that colours today's line (dataset 0) by price, spanning a gradient from the pixel of the
+ * day's highest price to that of its lowest, so the colours follow the prices exactly.
+ * QuickChart doesn't expose the scale's methods (e.g. getPixelForValue) to plugins, so the pixels are computed from the
+ * scale's plain properties. Any failure leaves the line in its default colour rather than failing the whole chart.
  */
 function priceGradientPlugin(lowest: number, highest: number): string {
   return `{
     afterLayout: function (chart) {
-      var scale = chart.scales['y-axis-0'];
-      var top = scale.getPixelForValue(${round2(highest)});
-      var bottom = Math.max(scale.getPixelForValue(${round2(lowest)}), top + 1);
-      var gradient = function (colors) {
-        var g = chart.ctx.createLinearGradient(0, top, 0, bottom);
-        colors.forEach(function (color, i) { g.addColorStop(i / (colors.length - 1), color); });
-        return g;
-      };
-      chart.data.datasets[0].borderColor = gradient(${JSON.stringify(PRICE_COLORS)});
-      chart.data.datasets[0].backgroundColor = gradient(${JSON.stringify(PRICE_FILL_COLORS)});
+      try {
+        var scale = chart.scales['y-axis-0'];
+        var area = chart.chartArea;
+        var top = scale && isFinite(scale.top) ? scale.top : area.top;
+        var bottom = scale && isFinite(scale.bottom) ? scale.bottom : area.bottom;
+        var min = scale.min, max = scale.max;
+        if (!isFinite(top) || !isFinite(bottom) || !isFinite(min) || !isFinite(max) || max <= min) {
+          return;
+        }
+        var pixel = function (value) { return bottom - ((value - min) / (max - min)) * (bottom - top); };
+        var from = pixel(${round2(highest)});
+        var to = Math.max(pixel(${round2(lowest)}), from + 1);
+        var gradient = function (colors) {
+          var g = chart.ctx.createLinearGradient(0, from, 0, to);
+          colors.forEach(function (color, i) { g.addColorStop(i / (colors.length - 1), color); });
+          return g;
+        };
+        chart.data.datasets[0].borderColor = gradient(${JSON.stringify(PRICE_COLORS)});
+        chart.data.datasets[0].backgroundColor = gradient(${JSON.stringify(PRICE_FILL_COLORS)});
+      } catch (e) {
+        // Keep the default colours
+      }
     }
   }`;
 }
