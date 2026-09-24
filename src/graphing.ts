@@ -1,12 +1,11 @@
 import {TibberPricePlatform} from './platform';
 import fs from 'fs';
-import {dateHrEq, padTo2Digits} from './utils';
+import {clamp, dateHrEq, padTo2Digits} from './utils';
 import {CachedTibberClient, PricePoint} from './tibber';
 
 const HOUR_MS = 60 * 60 * 1000;
-// Today's line is coloured by price: from the day's highest price (first colour) to its lowest (last colour)
-const PRICE_COLORS = ['#8E0E00', '#e73827', '#f0a202', '#2e9e47'];
-const PRICE_FILL_COLORS = ['rgba(142, 14, 0, 0.16)', 'rgba(231, 56, 39, 0.12)', 'rgba(240, 162, 2, 0.08)', 'rgba(46, 158, 71, 0.04)'];
+// Today's line is coloured by price, in bands from the day's lowest price (first colour) to its highest (last colour)
+const PRICE_BANDS = ['#2e9e47', '#8db42c', '#f0a202', '#f07a1a', '#e73827', '#8E0E00'];
 
 export class TibberGraphing {
 
@@ -80,17 +79,27 @@ export function buildChartConfig(now: Date, today: PricePoint[], tomorrow?: Pric
   const highest = today.reduce((max, point) => (point.price > max.price ? point : max), today[0]);
   const x = (point: PricePoint) => hoursSinceMidnight(point.startsAt);
 
-  const datasets: object[] = [{
-    label: 'Today',
-    data: toSteps(today),
+  // Today's line is drawn as one dataset per price band, each in its own colour.
+  // (QuickChart doesn't let plugins draw, so a real gradient along the line isn't possible there.)
+  const datasets: object[] = priceBands(toSteps(today), lowest.price, highest.price).map((data, band) => ({
+    label: '',
+    data,
     steppedLine: 'after',
+    spanGaps: false,
     pointRadius: 0,
+    borderWidth: 3,
+    borderColor: PRICE_BANDS[band],
+    fill: false,
+  }));
+  // Only there for the legend
+  datasets.push({
+    label: 'Today',
+    data: [],
     pointStyle: 'line',
     borderWidth: 3,
-    // Line & fill colours are set by the price gradient plugin below. The fill is a faint wash in the same colours.
-    borderColor: PRICE_COLORS[0],
-    fill: 'origin',
-  }];
+    borderColor: PRICE_BANDS[PRICE_BANDS.length - 2],
+    fill: false,
+  });
   if (hasTomorrow) {
     datasets.push({
       label: 'Tomorrow',
@@ -104,6 +113,16 @@ export function buildChartConfig(now: Date, today: PricePoint[], tomorrow?: Pric
       fill: false,
     });
   }
+  // A faint wash under today's line (drawn below everything else, as the last dataset)
+  const wash = {
+    label: '',
+    data: toSteps(today),
+    steppedLine: 'after',
+    pointRadius: 0,
+    borderWidth: 0,
+    backgroundColor: 'rgba(231, 56, 39, 0.06)',
+    fill: 'origin',
+  };
   // Markers on today's line: the current price, and the day's lowest & highest price. Hidden from the legend.
   datasets.push({
     label: '',
@@ -117,8 +136,8 @@ export function buildChartConfig(now: Date, today: PricePoint[], tomorrow?: Pric
     pointRadius: 7,
     pointBorderWidth: 3,
     pointBorderColor: 'white',
-    pointBackgroundColor: [...(current ? ['#333333'] : []), PRICE_COLORS[PRICE_COLORS.length - 1], PRICE_COLORS[0]],
-  });
+    pointBackgroundColor: [...(current ? ['#333333'] : []), PRICE_BANDS[0], PRICE_BANDS[PRICE_BANDS.length - 1]],
+  }, wash);
 
   // The label sits on the opposite side of the chart from its marker, and just outside the day's price range
   // (above the highest price, below the lowest), so it never covers today's line
@@ -144,7 +163,6 @@ export function buildChartConfig(now: Date, today: PricePoint[], tomorrow?: Pric
   const chartConf = {
     type: 'line',
     data: {datasets},
-    plugins: ['<PRICE_GRADIENT_PLUGIN>'],
     options: {
       layout: {padding: {left: 8, right: 24, top: 8, bottom: 8}},
       title: {
@@ -198,44 +216,32 @@ export function buildChartConfig(now: Date, today: PricePoint[], tomorrow?: Pric
   };
 
   return JSON.stringify(chartConf)
-    .replace('"<PRICE_GRADIENT_PLUGIN>"', priceGradientPlugin(lowest.price, highest.price))
     .replace('"<LEGEND_FILTER>"', 'function (item) { return item.text !== ""; }')
     .replace('"<HOUR_TICK>"', 'function (value) { return value < 10 ? "0" + value : String(value); }');
 }
 
 /**
- * An inline Chart.js plugin that colours today's line (dataset 0) by price, spanning a gradient from the pixel of the
- * day's highest price to that of its lowest, so the colours follow the prices exactly.
- * QuickChart doesn't expose the scale's methods (e.g. getPixelForValue) to plugins, so the pixels are computed from the
- * scale's plain properties. Any failure leaves the line in its default colour rather than failing the whole chart.
+ * Splits the steps into one series per price band. Each step (and the jump to the next price) gets the colour of the
+ * band its price falls in. Points of other bands are left out, with a gap (null) after each run.
  */
-function priceGradientPlugin(lowest: number, highest: number): string {
-  return `{
-    afterLayout: function (chart) {
-      try {
-        var scale = chart.scales['y-axis-0'];
-        var area = chart.chartArea;
-        var top = scale && isFinite(scale.top) ? scale.top : area.top;
-        var bottom = scale && isFinite(scale.bottom) ? scale.bottom : area.bottom;
-        var min = scale.min, max = scale.max;
-        if (!isFinite(top) || !isFinite(bottom) || !isFinite(min) || !isFinite(max) || max <= min) {
-          return;
-        }
-        var pixel = function (value) { return bottom - ((value - min) / (max - min)) * (bottom - top); };
-        var from = pixel(${round2(highest)});
-        var to = Math.max(pixel(${round2(lowest)}), from + 1);
-        var gradient = function (colors) {
-          var g = chart.ctx.createLinearGradient(0, from, 0, to);
-          colors.forEach(function (color, i) { g.addColorStop(i / (colors.length - 1), color); });
-          return g;
-        };
-        chart.data.datasets[0].borderColor = gradient(${JSON.stringify(PRICE_COLORS)});
-        chart.data.datasets[0].backgroundColor = gradient(${JSON.stringify(PRICE_FILL_COLORS)});
-      } catch (e) {
-        // Keep the default colours
-      }
+function priceBands(steps: {x: number; y: number}[], lowest: number, highest: number): {x: number; y: number | null}[][] {
+  const bandOf = (price: number) => (highest > lowest
+    ? clamp(Math.floor(((price - lowest) / (highest - lowest)) * PRICE_BANDS.length), 0, PRICE_BANDS.length - 1)
+    : Math.floor(PRICE_BANDS.length / 2));
+  const bands: {x: number; y: number | null}[][] = PRICE_BANDS.map(() => []);
+  for (let i = 0; i < steps.length - 1; i++) {
+    const band = bands[bandOf(steps[i].y)];
+    const previous = band[band.length - 1];
+    if (!previous || previous.x !== steps[i].x || previous.y === null) {
+      band.push(steps[i]);
     }
-  }`;
+    band.push(steps[i + 1]);
+    // End the run unless the next step is in the same band
+    if (i + 1 < steps.length - 1 && bandOf(steps[i + 1].y) !== bandOf(steps[i].y)) {
+      band.push({x: steps[i + 1].x, y: null});
+    }
+  }
+  return bands;
 }
 
 async function renderChart(chart: string): Promise<Buffer> {
