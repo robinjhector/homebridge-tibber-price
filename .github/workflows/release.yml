@@ -1,14 +1,7 @@
 # Publishes the package to npm when a GitHub release is published.
-#
-# To release:
-#   1. Bump "version" in package.json (e.g. `npm version 2.1.0 --no-git-tag-version`),
-#      commit it as "Release vX.Y.Z" and push to master.
-#   2. Create a GitHub release with the tag set to that same version (e.g. `2.1.0`),
-#      targeting master. Mark it as a pre-release to publish under the npm `beta` tag.
+# See RELEASING.md for the step-by-step release process.
 #
 # Authentication uses npm trusted publishing (OIDC), so no npm token is stored in the repo.
-# One-time setup on npmjs.com: package settings -> Trusted Publisher -> GitHub Actions,
-# with owner `robinjhector`, repository `homebridge-tibber-price` and workflow `release.yml`.
 
 name: Release
 
