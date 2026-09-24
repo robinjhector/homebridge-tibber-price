@@ -1,9 +1,12 @@
 import {TibberPricePlatform} from './platform';
 import fs from 'fs';
-import {dateHrEq} from './utils';
+import {dateHrEq, padTo2Digits} from './utils';
 import {CachedTibberClient, PricePoint} from './tibber';
 
 const HOUR_MS = 60 * 60 * 1000;
+// Today's line is coloured by price: from the day's highest price (first colour) to its lowest (last colour)
+const PRICE_COLORS = ['#8E0E00', '#e73827', '#f0a202', '#2e9e47'];
+const PRICE_FILL_COLORS = ['rgba(142, 14, 0, 0.16)', 'rgba(231, 56, 39, 0.12)', 'rgba(240, 162, 2, 0.08)', 'rgba(46, 158, 71, 0.04)'];
 
 export class TibberGraphing {
 
@@ -67,72 +70,158 @@ export class TibberGraphing {
 }
 
 /**
- * Builds a Chart.js v2 config (QuickChart's default version), as a JS string since it calls QuickChart's gradient helper.
+ * Builds a Chart.js v2 config (QuickChart's default version). It's a JS string rather than JSON, since it calls
+ * QuickChart's gradient helper and contains a few callbacks.
  */
 export function buildChartConfig(now: Date, today: PricePoint[], tomorrow?: PricePoint[]): string {
+  const hasTomorrow = !!tomorrow && tomorrow.length > 0;
+  const current = [...today].reverse().find(point => point.startsAt <= now);
+  const lowest = today.reduce((min, point) => (point.price < min.price ? point : min), today[0]);
+  const highest = today.reduce((max, point) => (point.price > max.price ? point : max), today[0]);
+  const x = (point: PricePoint) => hoursSinceMidnight(point.startsAt);
+
   const datasets: object[] = [{
     label: 'Today',
     data: toSteps(today),
-    fill: false,
     steppedLine: 'after',
     pointRadius: 0,
-    borderColor: '<GRADIENT_FOR_TODAY_LINE>',
+    pointStyle: 'line',
     borderWidth: 3,
+    // Line & fill colours are set by the price gradient plugin below. The fill is a faint wash in the same colours.
+    borderColor: PRICE_COLORS[0],
+    fill: 'origin',
   }];
-  if (tomorrow && tomorrow.length > 0) {
+  if (hasTomorrow) {
     datasets.push({
       label: 'Tomorrow',
-      data: toSteps(tomorrow),
-      fill: false,
+      data: toSteps(tomorrow!),
       steppedLine: 'after',
       pointRadius: 0,
-      borderColor: '<GRADIENT_FOR_TOMORROW_LINE>',
-      borderWidth: 1.5,
+      pointStyle: 'line',
+      borderWidth: 2,
+      borderDash: [8, 5],
+      borderColor: 'rgba(110, 116, 125, 0.85)',
+      fill: false,
     });
   }
+  // Markers on today's line: the current price, and the day's lowest & highest price. Hidden from the legend.
+  datasets.push({
+    label: '',
+    data: [
+      ...(current ? [{x: hoursSinceMidnight(now), y: round2(current.price)}] : []),
+      {x: x(lowest), y: round2(lowest.price)},
+      {x: x(highest), y: round2(highest.price)},
+    ],
+    showLine: false,
+    fill: false,
+    pointRadius: 7,
+    pointBorderWidth: 3,
+    pointBorderColor: 'white',
+    pointBackgroundColor: [...(current ? ['#333333'] : []), PRICE_COLORS[PRICE_COLORS.length - 1], PRICE_COLORS[0]],
+  });
 
-  const current = [...today].reverse().find(point => point.startsAt <= now);
+  // The label sits on the opposite side of the chart from its marker, and just outside the day's price range
+  // (above the highest price, below the lowest), so it never covers today's line
+  const referenceLine = (point: PricePoint, text: string, above: boolean) => ({
+    type: 'line',
+    mode: 'horizontal',
+    scaleID: 'y-axis-0',
+    value: round2(point.price),
+    borderColor: 'rgba(0, 0, 0, 0.12)',
+    borderWidth: 1,
+    label: {
+      enabled: true,
+      position: x(point) < 12 ? 'right' : 'left',
+      yAdjust: above ? -18 : 18,
+      backgroundColor: 'rgba(255, 255, 255, 0.85)',
+      fontColor: '#444444',
+      fontSize: 18,
+      fontStyle: 'normal',
+      content: `${text} ${Math.round(point.price)} at ${formatTime(point.startsAt)}`,
+    },
+  });
+
   const chartConf = {
     type: 'line',
     data: {datasets},
+    plugins: ['<PRICE_GRADIENT_PLUGIN>'],
     options: {
+      layout: {padding: {left: 8, right: 24, top: 8, bottom: 8}},
+      title: {
+        display: true,
+        text: 'Electricity price · ' + now.toLocaleDateString('en-GB', {weekday: 'long', day: 'numeric', month: 'long'}),
+        fontSize: 28,
+        fontColor: '#222222',
+        padding: 16,
+      },
+      legend: {
+        position: 'top',
+        align: 'end',
+        labels: {fontSize: 18, fontColor: '#444444', usePointStyle: true, filter: '<LEGEND_FILTER>'},
+      },
       scales: {
         xAxes: [{
           type: 'linear',
-          ticks: {min: 0, max: 24, stepSize: 1},
-          gridLines: {color: 'rgba(0, 0, 0, 0.03)'},
+          ticks: {min: 0, max: 24, stepSize: 1, fontSize: 18, fontColor: '#666666', callback: '<HOUR_TICK>'},
+          gridLines: {drawOnChartArea: false, color: 'rgba(0, 0, 0, 0.15)'},
         }],
         yAxes: [{
-          gridLines: {color: 'rgba(0, 0, 0, 0.03)'},
+          ticks: {fontSize: 18, fontColor: '#666666', maxTicksLimit: 6},
+          gridLines: {color: 'rgba(0, 0, 0, 0.06)', zeroLineColor: 'rgba(0, 0, 0, 0.3)', drawBorder: false},
         }],
       },
       annotation: {
-        annotations: [{
-          type: 'line',
-          mode: 'vertical',
-          scaleID: 'x-axis-0',
-          value: hoursSinceMidnight(now),
-          borderColor: 'rgba(126, 126, 126, 0.5)',
-          borderWidth: 1,
-          label: {
-            enabled: current !== undefined,
-            backgroundColor: 'rgba(0, 0, 0, 0.4)',
-            content: 'Now: ' + (current ? Math.round(current.price) : ''),
+        drawTime: 'afterDatasetsDraw',
+        annotations: [
+          referenceLine(highest, 'Highest', true),
+          referenceLine(lowest, 'Lowest', false),
+          {
+            type: 'line',
+            mode: 'vertical',
+            scaleID: 'x-axis-0',
+            value: hoursSinceMidnight(now),
+            borderColor: 'rgba(51, 51, 51, 0.6)',
+            borderWidth: 2,
+            label: {
+              enabled: current !== undefined,
+              position: 'top',
+              backgroundColor: 'rgba(51, 51, 51, 0.85)',
+              fontSize: 22,
+              fontStyle: 'bold',
+              yAdjust: 8,
+              content: 'Now ' + (current ? Math.round(current.price) : ''),
+            },
           },
-        }],
+        ],
       },
     },
   };
 
   return JSON.stringify(chartConf)
-    .replace(
-      '"<GRADIENT_FOR_TODAY_LINE>"',
-      'getGradientFillHelper("vertical", ["#e73827", "#8E0E00", "#1F1C18"])',
-    )
-    .replace(
-      '"<GRADIENT_FOR_TOMORROW_LINE>"',
-      'getGradientFillHelper("vertical", ["rgba(244, 121, 31, 0.5)", "rgba(101, 153, 153, 0.5)"])',
-    );
+    .replace('"<PRICE_GRADIENT_PLUGIN>"', priceGradientPlugin(lowest.price, highest.price))
+    .replace('"<LEGEND_FILTER>"', 'function (item) { return item.text !== ""; }')
+    .replace('"<HOUR_TICK>"', 'function (value) { return value < 10 ? "0" + value : String(value); }');
+}
+
+/**
+ * An inline Chart.js plugin that colours today's line (dataset 0) by price. Once the y-axis is laid out, it spans a
+ * gradient from the pixel of the day's highest price to that of its lowest, so the colours follow the prices exactly.
+ */
+function priceGradientPlugin(lowest: number, highest: number): string {
+  return `{
+    afterLayout: function (chart) {
+      var scale = chart.scales['y-axis-0'];
+      var top = scale.getPixelForValue(${round2(highest)});
+      var bottom = Math.max(scale.getPixelForValue(${round2(lowest)}), top + 1);
+      var gradient = function (colors) {
+        var g = chart.ctx.createLinearGradient(0, top, 0, bottom);
+        colors.forEach(function (color, i) { g.addColorStop(i / (colors.length - 1), color); });
+        return g;
+      };
+      chart.data.datasets[0].borderColor = gradient(${JSON.stringify(PRICE_COLORS)});
+      chart.data.datasets[0].backgroundColor = gradient(${JSON.stringify(PRICE_FILL_COLORS)});
+    }
+  }`;
 }
 
 async function renderChart(chart: string): Promise<Buffer> {
@@ -177,6 +266,10 @@ function hoursSinceMidnight(date: Date): number {
 
 function startOfDay(date: Date): number {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+}
+
+function formatTime(date: Date): string {
+  return `${padTo2Digits(date.getHours())}:${padTo2Digits(date.getMinutes())}`;
 }
 
 function round2(value: number): number {
