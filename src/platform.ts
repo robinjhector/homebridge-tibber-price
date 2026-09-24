@@ -13,12 +13,12 @@ import {TibberGraphing} from './graphing';
  */
 
 export class TibberPricePlatform implements DynamicPlatformPlugin {
-  public readonly Service: typeof Service = this.api.hap.Service;
-  public readonly Characteristic: typeof Characteristic = this.api.hap.Characteristic;
+  public readonly Service: typeof Service;
+  public readonly Characteristic: typeof Characteristic;
 
   // this is used to track restored cached accessories
   public readonly accessories: PlatformAccessory[] = [];
-  public readonly backgroundTasks: (() => void)[] = [];
+  public readonly backgroundTasks: (() => void | Promise<void>)[] = [];
   public readonly tibber?: CachedTibberClient;
 
   constructor(
@@ -26,6 +26,8 @@ export class TibberPricePlatform implements DynamicPlatformPlugin {
     public readonly config: PlatformConfig,
     public readonly api: API,
   ) {
+    this.Service = this.api.hap.Service;
+    this.Characteristic = this.api.hap.Characteristic;
     this.log.debug('Finished initializing platform:', this.config.name);
 
     const accessToken = this.config['accessToken'];
@@ -72,11 +74,10 @@ export class TibberPricePlatform implements DynamicPlatformPlugin {
 
     setInterval(() => {
       for (const backgroundTask of this.backgroundTasks) {
-        try {
-          backgroundTask();
-        } catch (e) {
-          this.log.error('Failed to perform background task!');
-        }
+        // Tasks may be async, make sure a rejection never goes unhandled (that would crash Homebridge)
+        Promise.resolve()
+          .then(() => backgroundTask())
+          .catch(err => this.log.error('Failed to perform background task!', err));
       }
     }, 1000 * 60);
   }
@@ -97,7 +98,7 @@ export class TibberPricePlatform implements DynamicPlatformPlugin {
       }
     } else if (existingAccessory) {
       this.log.info('Removing price sensor with id %s', uuid);
-      this.api.unregisterPlatformAccessories(PLATFORM_NAME, PLATFORM_NAME, [existingAccessory]);
+      this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [existingAccessory]);
     }
   }
 
@@ -117,7 +118,7 @@ export class TibberPricePlatform implements DynamicPlatformPlugin {
       }
     } else if (existingAccessory) {
       this.log.info('Removing relative price sensor with id %s', uuid);
-      this.api.unregisterPlatformAccessories(PLATFORM_NAME, PLATFORM_NAME, [existingAccessory]);
+      this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [existingAccessory]);
     }
   }
 
@@ -136,8 +137,8 @@ export class TibberPricePlatform implements DynamicPlatformPlugin {
         this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [priceSensorAccessory]);
       }
     } else if (existingAccessory) {
-      this.log.info('Removing relative price sensor with id %s', uuid);
-      this.api.unregisterPlatformAccessories(PLATFORM_NAME, PLATFORM_NAME, [existingAccessory]);
+      this.log.info('Removing gauge price sensor with id %s', uuid);
+      this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [existingAccessory]);
     }
   }
 
@@ -151,6 +152,6 @@ export class TibberPricePlatform implements DynamicPlatformPlugin {
 export interface TypedConfig {
   accessToken: string;
   homeId?: string;
-  priceIncTax: boolean;
+  priceIncTax?: boolean;
 }
 

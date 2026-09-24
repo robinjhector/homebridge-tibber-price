@@ -2,6 +2,11 @@ import {HAPStatus, PlatformAccessory, Service} from 'homebridge';
 
 import {TibberPricePlatform} from './platform';
 import {CachedTibberClient} from './tibber';
+import {clamp} from './utils';
+
+// HomeKit's allowed range for CurrentAmbientLightLevel. Negative (or zero) spot prices can't be represented.
+const MIN_LUX = 0.0001;
+const MAX_LUX = 100000;
 
 /**
  * Registers a price value accessory, that will manifest itself as a LightSensor.
@@ -30,7 +35,7 @@ export class TibberPriceSensor {
 
     // set handlers
     this.service.getCharacteristic(this.platform.Characteristic.CurrentAmbientLightLevel)
-      .onGet(() => this.tibber.getCurrentPrice().catch(err => {
+      .onGet(() => this.getPrice().catch(err => {
         this.platform.log.error('[priceSensor] Failed to get price', err);
         throw new this.platform.api.hap.HapStatusError(HAPStatus.SERVICE_COMMUNICATION_FAILURE);
       }));
@@ -41,10 +46,14 @@ export class TibberPriceSensor {
 
   private updateValue(): void {
     this.platform.log.debug('Updating price in the background...');
-    this.tibber.getCurrentPrice()
+    this.getPrice()
       .then(price => this.service.updateCharacteristic(this.platform.Characteristic.CurrentAmbientLightLevel, price))
       .catch(err => {
-        this.platform.log.error('[relativePriceSensor] Failed to update price in background', err);
+        this.platform.log.error('[priceSensor] Failed to update price in background', err);
       });
+  }
+
+  private getPrice(): Promise<number> {
+    return this.tibber.getCurrentPrice().then(price => clamp(price, MIN_LUX, MAX_LUX));
   }
 }
