@@ -152,7 +152,11 @@ export class CachedTibberClient {
   private toPricePoints(prices: IPrice[]): PricePoint[] {
     return prices
       .filter(price => price.startsAt)
-      .map(price => ({startsAt: new Date(price.startsAt!), price: fractionated(price, this.priceIncTax)}));
+      .map(price => ({
+        startsAt: new Date(price.startsAt!),
+        price: fractionated(price, this.priceIncTax),
+        level: price.level,
+      }));
   }
 
   private getPricesForDay(forDate: Date): Promise<IPrice[]> {
@@ -280,6 +284,8 @@ export interface PricePoint {
   startsAt: Date;
   /** In the smallest currency unit (öre, cents etc) */
   price: number;
+  /** Tibber's price level (VERY_CHEAP, CHEAP, NORMAL, EXPENSIVE or VERY_EXPENSIVE), relative to the recent average */
+  level?: string;
 }
 
 /**
