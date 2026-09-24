@@ -44,13 +44,21 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # prepublishOnly runs lint + build
+      # prepublishOnly runs lint + build.
+      # The npm dist-tag follows the version: a pre-release version (e.g. 2.2.0-beta.0) goes to "beta", anything else
+      # to "latest". The release's pre-release checkbox is only used for a warning if the two disagree.
       - name: Publish to npm
         env:
           PRERELEASE: ${{ github.event.release.prerelease }}
         run: |
-          if [ "$PRERELEASE" = "true" ]; then
-            npm publish --tag beta
-          else
-            npm publish
+          VERSION=$(node -p "require('./package.json').version")
+          case "$VERSION" in
+            *-*) DIST_TAG=beta ;;
+            *) DIST_TAG=latest ;;
+          esac
+          if [ "$PRERELEASE" = "true" ] && [ "$DIST_TAG" = "latest" ]; then
+            echo "::warning::The release is marked as a pre-release, but $VERSION isn't a pre-release version. Publishing as latest."
+          elif [ "$PRERELEASE" != "true" ] && [ "$DIST_TAG" = "beta" ]; then
+            echo "::warning::$VERSION is a pre-release version, but the release isn't marked as one. Publishing as beta."
           fi
+          npm publish --tag "$DIST_TAG"
