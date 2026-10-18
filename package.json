@@ -40,7 +40,7 @@
     "price"
   ],
   "dependencies": {
-    "tibber-api": "^5.6.0"
+    "tibber-api": "^6.0.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
